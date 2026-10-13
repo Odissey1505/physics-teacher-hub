@@ -1,0 +1,29 @@
+# Залежності
+node_modules/
+
+# Збірка
+dist/
+dist-ssr/
+*.tsbuildinfo
+
+# Локальні змінні середовища (містять ваші ключі)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+
+# Журнали і тимчасові файли
+*.log
+npm-debug.log*
+.vite/
+.cache/
+tmp/
+*.tmp
+
+# Редактори та ОС
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

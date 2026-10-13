@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="uk" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Physics Teacher Hub — цифровий кабінет учителя фізики" />
+    <title>Physics Teacher Hub</title>
+    <script>
+      // Застосовуємо тему до першого рендеру, щоб не було «спалаху».
+      try {
+        var t = localStorage.getItem("pth-theme");
+        if (t === "light") document.documentElement.classList.remove("dark");
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>
