@@ -1,0 +1,159 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Дизайн-токени (shadcn-сумісні) ---------- */
+:root {
+  --background: #f6f8fc;
+  --surface: #ffffff;
+  --elevated: #eef2f8;
+  --foreground: #0f172a;
+  --muted-foreground: #526077;
+  --border: #d7dee9;
+  --input: #cbd5e1;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #7c3aed;
+  --secondary-foreground: #ffffff;
+  --success: #059669;
+  --warning: #b45309;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --ring: #2563eb;
+  --radius: 0.85rem;
+  --field-line: rgba(37, 99, 235, 0.12);
+}
+
+.dark {
+  --background: #0b1120;
+  --surface: #111827;
+  --elevated: #1e293b;
+  --foreground: #f8fafc;
+  --muted-foreground: #a3b0c4;
+  --border: #334155;
+  --input: #3b4a61;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #8b5cf6;
+  --secondary-foreground: #ffffff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --ring: #60a5fa;
+  --field-line: rgba(96, 165, 250, 0.14);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
+/* ---------- Вміст із редактора (теорія, нотатки, конспекти) ---------- */
+.rich-content {
+  line-height: 1.7;
+}
+.rich-content h1 { font-size: 1.6em; font-weight: 700; margin: 1em 0 0.5em; }
+.rich-content h2 { font-size: 1.35em; font-weight: 700; margin: 1em 0 0.5em; }
+.rich-content h3 { font-size: 1.15em; font-weight: 650; margin: 0.9em 0 0.4em; }
+.rich-content p { margin: 0.5em 0; }
+.rich-content ul { list-style: disc; padding-left: 1.4em; margin: 0.5em 0; }
+.rich-content ol { list-style: decimal; padding-left: 1.4em; margin: 0.5em 0; }
+.rich-content a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.rich-content img { max-width: 100%; border-radius: 0.6rem; margin: 0.75em 0; }
+.rich-content blockquote {
+  border-left: 4px solid var(--primary);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  padding: 0.6em 1em;
+  border-radius: 0 0.6rem 0.6rem 0;
+  margin: 0.8em 0;
+}
+.rich-content mark {
+  background: color-mix(in oklab, #facc15 45%, transparent);
+  color: inherit;
+  padding: 0 0.15em;
+  border-radius: 0.2em;
+}
+.rich-content table { border-collapse: collapse; width: 100%; margin: 0.8em 0; display: block; overflow-x: auto; }
+.rich-content th, .rich-content td { border: 1px solid var(--border); padding: 0.4em 0.7em; text-align: left; vertical-align: top; min-width: 4em; }
+.rich-content th { background: var(--elevated); font-weight: 600; }
+.rich-content code { background: var(--elevated); padding: 0.1em 0.35em; border-radius: 0.3em; font-size: 0.9em; }
+.rich-content hr { border-color: var(--border); margin: 1.2em 0; }
+.rich-content .math-error { color: var(--destructive); font-family: monospace; }
+
+/* Редактор TipTap */
+.tiptap { outline: none; min-height: 220px; }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.tiptap .selectedCell { background: color-mix(in oklab, var(--primary) 18%, transparent); }
+
+/* Декоративні силові лінії */
+.field-lines {
+  background-image:
+    radial-gradient(ellipse at 20% 50%, transparent 38%, var(--field-line) 39%, transparent 40%),
+    radial-gradient(ellipse at 20% 50%, transparent 52%, var(--field-line) 53%, transparent 54%),
+    radial-gradient(ellipse at 80% 50%, transparent 38%, var(--field-line) 39%, transparent 40%),
+    radial-gradient(ellipse at 80% 50%, transparent 52%, var(--field-line) 53%, transparent 54%);
+}
+
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
