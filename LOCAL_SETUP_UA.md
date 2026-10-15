@@ -65,9 +65,9 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxxxxxxxxxxxxxxx
 
 Файл `.env.local` містить ваші ключі, тому він **не** завантажується на GitHub (це вже налаштовано у `.gitignore`).
 
-## 6. Виконайте SQL-міграції
+## 6. Виконайте SQL у Supabase
 
-Якщо ще не зробили — див. [SUPABASE_SETUP_UA.md](SUPABASE_SETUP_UA.md), крок 3. Без міграцій застосунок покаже помилку «У базі даних немає потрібних таблиць».
+Якщо ще не зробили — див. [SUPABASE_SETUP_UA.md](SUPABASE_SETUP_UA.md), крок 3 (файл `supabase/physics-teacher-hub-SQL.sql`). Без цього застосунок покаже помилку «У базі даних немає таблиць Physics Teacher Hub».
 
 ## 7. Налаштуйте вхід (Authentication)
 
@@ -126,7 +126,8 @@ npm run preview
 | Проблема | Що зробити |
 |---|---|
 | Екран «Потрібно підключити Supabase» | Перевірте назву файлу `.env.local` (не `.env.local.txt`) та значення. Після зміни `.env.local` зупиніть сервер (Ctrl + C) і знову запустіть `npm run dev`. |
-| «У базі даних немає потрібних таблиць» | Виконайте обидві SQL-міграції по черзі. |
+| «У базі даних немає таблиць Physics Teacher Hub» | Виконайте `supabase/physics-teacher-hub-SQL.sql` у SQL Editor. |
+| «Немає доступу до Physics Teacher Hub» | Ваш email не додано в `pth_allowed_emails` (див. SUPABASE_SETUP_UA.md, крок 3). |
 | «Немає з'єднання з сервером» | Перевірте інтернет і `VITE_SUPABASE_URL` (має бути `https://…supabase.co`, без `/` наприкінці). Перевірте, що проєкт Supabase не призупинено (безкоштовні проєкти «засинають» після тижня без активності — їх можна відновити в панелі Supabase). |
 | «Email ще не підтверджено» | Відкрийте лист від Supabase (перевірте «Спам») або вимкніть підтвердження — див. SUPABASE_SETUP_UA.md, крок 4. |
 | `npm` не знайдено | Перевстановіть Node.js і відкрийте новий термінал. |

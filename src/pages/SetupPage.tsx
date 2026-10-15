@@ -30,10 +30,10 @@ export function SetupPage({ secretKey }: { secretKey?: boolean }) {
           <li className="flex gap-3">
             <Database className="mt-0.5 size-5 shrink-0 text-primary" />
             <div>
-              <p className="font-medium">1. Створіть проєкт Supabase і виконайте SQL-міграції</p>
+              <p className="font-medium">1. Виконайте SQL у своєму проєкті Supabase</p>
               <p className="text-sm text-muted-foreground">
-                SQL Editor → по черзі файли з папки <code>supabase/migrations</code> (спочатку …0001_schema.sql, потім
-                …0002_functions.sql).
+                SQL Editor → New query → увесь вміст файлу <code>supabase/physics-teacher-hub-SQL.sql</code> → Run. Можна в
+                проєкті, де вже працюють інші застосунки: усі таблиці мають префікс <code>pth_</code>.
               </p>
             </div>
           </li>

@@ -66,7 +66,7 @@
 ## 5–6. Перевірте, що все на місці
 
 Перед підтвердженням погляньте на список файлів:
-- є `src/`, `supabase/migrations/` (обидва `.sql`), `public/`, `package.json`, `package-lock.json`, документація;
+- є `src/`, `supabase/` (з `physics-teacher-hub-SQL.sql`, `uninstall.sql` і папкою `migrations/`), `public/`, `package.json`, `package-lock.json`, документація;
 - **немає** `node_modules/`, `dist/`, `.env.local`.
 
 Якщо випадково додали зайвий файл — натисніть ✕ біля нього в списку до коміту.

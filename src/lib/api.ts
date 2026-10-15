@@ -29,6 +29,14 @@ export type TableName =
 
 const PAGE = 1000;
 
+/**
+ * Усі таблиці й функції Physics Teacher Hub у базі мають префікс pth_ — так застосунок
+ * може жити в одному проєкті Supabase з іншими застосунками без конфліктів назв.
+ * У коді та у файлах резервних копій використовуються назви без префікса.
+ */
+export const DB_PREFIX = "pth_";
+const tbl = (name: TableName | "profiles") => db().from(`${DB_PREFIX}${name}`);
+
 /** Завантажує всі записи користувача (RLS повертає лише власні) з посторінковою вибіркою. */
 export async function fetchAll<T>(
   table: TableName,
@@ -37,7 +45,7 @@ export async function fetchAll<T>(
 ): Promise<T[]> {
   const out: T[] = [];
   for (let from = 0; ; from += PAGE) {
-    let q = db().from(table).select("*");
+    let q = tbl(table).select("*");
     if (filter) q = q.eq(filter.column, filter.value);
     for (const o of order) q = q.order(o.column, { ascending: o.ascending ?? true });
     q = q.order(table === "topic_content" ? "topic_id" : table === "quiz_answer_keys" ? "question_id" : "id");
@@ -58,7 +66,7 @@ export const fetchNotes = () => fetchAll<Note>("notes", [{ column: "created_at",
 export const fetchQuizzes = () => fetchAll<Quiz>("quizzes", [{ column: "created_at", ascending: false }]);
 
 export async function fetchTopicContent(topicId: string): Promise<TopicContent | null> {
-  const { data, error } = await db().from("topic_content").select("*").eq("topic_id", topicId).maybeSingle();
+  const { data, error } = await tbl("topic_content").select("*").eq("topic_id", topicId).maybeSingle();
   if (error) throw error;
   return data as TopicContent | null;
 }
@@ -71,7 +79,7 @@ export async function fetchQuizQuestions(quizId: string): Promise<QuizQuestion[]
 /** Ключі відповідей — ЛИШЕ для редактора квізу або явного «Показати відповідь». */
 export async function fetchAnswerKeys(questionIds: string[]): Promise<QuizAnswerKey[]> {
   if (questionIds.length === 0) return [];
-  const { data, error } = await db().from("quiz_answer_keys").select("*").in("question_id", questionIds);
+  const { data, error } = await tbl("quiz_answer_keys").select("*").in("question_id", questionIds);
   if (error) throw error;
   return (data ?? []) as QuizAnswerKey[];
 }
@@ -79,7 +87,7 @@ export async function fetchAnswerKeys(questionIds: string[]): Promise<QuizAnswer
 export async function fetchProfile(): Promise<Profile | null> {
   const { data: u } = await db().auth.getUser();
   if (!u.user) return null;
-  const { data, error } = await db().from("profiles").select("*").eq("id", u.user.id).maybeSingle();
+  const { data, error } = await tbl("profiles").select("*").eq("id", u.user.id).maybeSingle();
   if (error) throw error;
   return data as Profile | null;
 }
@@ -87,14 +95,14 @@ export async function fetchProfile(): Promise<Profile | null> {
 export async function updateProfile(patch: Partial<Pick<Profile, "display_name">>) {
   const { data: u } = await db().auth.getUser();
   if (!u.user) throw new Error("Потрібна авторизація");
-  const { error } = await db().from("profiles").upsert({ id: u.user.id, ...patch });
+  const { error } = await tbl("profiles").upsert({ id: u.user.id, ...patch });
   if (error) throw error;
 }
 
 /* ---------------- Загальні CRUD ---------------- */
 
 export async function insertRow<T>(table: TableName, values: Record<string, unknown>): Promise<T> {
-  const { data, error } = await db().from(table).insert(values).select().single();
+  const { data, error } = await tbl(table).insert(values).select().single();
   if (error) throw error;
   return data as T;
 }
@@ -111,8 +119,7 @@ export async function updateVersioned<T>(
   patch: Record<string, unknown>,
   idColumn = "id",
 ): Promise<T> {
-  const { data, error } = await db()
-    .from(table)
+  const { data, error } = await tbl(table)
     .update(patch)
     .eq(idColumn, id)
     .eq("updated_at", expectedUpdatedAt)
@@ -120,7 +127,7 @@ export async function updateVersioned<T>(
     .maybeSingle();
   if (error) throw error;
   if (!data) {
-    const { data: current, error: e2 } = await db().from(table).select(idColumn).eq(idColumn, id).maybeSingle();
+    const { data: current, error: e2 } = await tbl(table).select(idColumn).eq(idColumn, id).maybeSingle();
     if (e2) throw e2;
     if (!current) throw new NotFoundError();
     throw new ConflictError();
@@ -130,7 +137,7 @@ export async function updateVersioned<T>(
 
 /** Поточна версія запису — для явного «Зберегти мої зміни поверх» після конфлікту. */
 export async function fetchUpdatedAt(table: TableName, id: string, idColumn = "id"): Promise<string> {
-  const { data, error } = await db().from(table).select("updated_at").eq(idColumn, id).maybeSingle();
+  const { data, error } = await tbl(table).select("updated_at").eq(idColumn, id).maybeSingle();
   if (error) throw error;
   if (!data) throw new NotFoundError();
   return (data as { updated_at: string }).updated_at;
@@ -138,19 +145,19 @@ export async function fetchUpdatedAt(table: TableName, id: string, idColumn = "i
 
 /** Просте оновлення одного-двох полів (обране, переміщення) — без перевірки версії. */
 export async function patchRow(table: TableName, id: string, patch: Record<string, unknown>) {
-  const { data, error } = await db().from(table).update(patch).eq("id", id).select("id");
+  const { data, error } = await tbl(table).update(patch).eq("id", id).select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new NotFoundError();
 }
 
 export async function patchMany(table: TableName, ids: string[], patch: Record<string, unknown>) {
   if (ids.length === 0) return;
-  const { error } = await db().from(table).update(patch).in("id", ids);
+  const { error } = await tbl(table).update(patch).in("id", ids);
   if (error) throw error;
 }
 
 export async function deleteRow(table: TableName, id: string) {
-  const { error } = await db().from(table).delete().eq("id", id);
+  const { error } = await tbl(table).delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -164,8 +171,7 @@ export async function saveTopicContent(
   if (expectedUpdatedAt) {
     return updateVersioned<TopicContent>("topic_content", topicId, expectedUpdatedAt, patch, "topic_id");
   }
-  const { data, error } = await db()
-    .from("topic_content")
+  const { data, error } = await tbl("topic_content")
     .insert({ topic_id: topicId, ...patch })
     .select()
     .single();
@@ -226,23 +232,21 @@ export interface PresentationData {
  */
 export async function fetchPresentationData(topicId: string): Promise<PresentationData> {
   const [content, materials, formulas, quizzes] = await Promise.all([
-    db().from("topic_content").select("summary,key_concepts,definitions,objectives,theory_html").eq("topic_id", topicId).maybeSingle(),
-    db()
-      .from("materials")
+    tbl("topic_content").select("summary,key_concepts,definitions,objectives,theory_html").eq("topic_id", topicId).maybeSingle(),
+    tbl("materials")
       .select("id,type,title,url,description,content_html,provider,sort_order,created_at")
       .eq("topic_id", topicId)
       .eq("visibility", "students")
       .order("sort_order")
       .order("created_at"),
-    db().from("formulas").select("id,name,latex,explanation,quantities,units").eq("topic_id", topicId).order("sort_order").order("created_at"),
-    db().from("quizzes").select("id,title").eq("topic_id", topicId).order("created_at"),
+    tbl("formulas").select("id,name,latex,explanation,quantities,units").eq("topic_id", topicId).order("sort_order").order("created_at"),
+    tbl("quizzes").select("id,title").eq("topic_id", topicId).order("created_at"),
   ]);
   for (const r of [content, materials, formulas, quizzes]) if (r.error) throw r.error;
   const quizIds = (quizzes.data ?? []).map((q) => q.id as string);
   let questions: QuizQuestion[] = [];
   if (quizIds.length) {
-    const { data, error } = await db()
-      .from("quiz_questions")
+    const { data, error } = await tbl("quiz_questions")
       .select("id,owner_id,quiz_id,qtype,prompt,options,image_url,sort_order,created_at,updated_at")
       .in("quiz_id", quizIds)
       .order("sort_order");
@@ -261,7 +265,7 @@ export async function fetchPresentationData(topicId: string): Promise<Presentati
 /* ---------------- RPC ---------------- */
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
-  const { data, error } = await db().rpc(fn, args);
+  const { data, error } = await db().rpc(`${DB_PREFIX}${fn}`, args);
   if (error) throw error;
   return data as T;
 }

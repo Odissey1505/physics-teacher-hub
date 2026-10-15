@@ -25,6 +25,7 @@ import {
   Link2,
   X,
   Loader2,
+  Lock,
 } from "lucide-react";
 import { Brand } from "./Brand";
 import { NAV_ITEMS } from "./nav";
@@ -39,7 +40,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/menu";
-import { ErrorState } from "@/components/common/States";
+import { EmptyState, ErrorState } from "@/components/common/States";
+import { isNoAccessError } from "@/lib/errors";
 import { useAuth } from "@/context/auth";
 import { useTheme } from "@/context/theme";
 import { useDialogs } from "@/context/dialogs";
@@ -183,6 +185,28 @@ function Breadcrumbs() {
   );
 }
 
+/** Акаунт є в проєкті Supabase (спільному з іншими застосунками), але не має доступу до цього кабінету. */
+function NoAccess() {
+  const { user, signOut } = useAuth();
+  return (
+    <EmptyState
+      icon={Lock}
+      title="Немає доступу до Physics Teacher Hub"
+      description={
+        <>
+          Акаунт <b>{user?.email}</b> не входить до списку дозволених. Якщо це ваш кабінет — додайте цей email у таблицю{" "}
+          <code>pth_allowed_emails</code> (SQL Editor у Supabase) або увійдіть з іншого акаунта.
+        </>
+      }
+      action={
+        <Button onClick={() => signOut()}>
+          <LogOut /> Вийти
+        </Button>
+      }
+    />
+  );
+}
+
 /** Ідемпотентне початкове наповнення: SQL-функція створює дані лише один раз на акаунт. */
 function useWorkspaceInit() {
   const { user } = useAuth();
@@ -193,7 +217,7 @@ function useWorkspaceInit() {
     staleTime: Infinity,
     gcTime: Infinity,
     refetchOnWindowFocus: false,
-    retry: 1,
+    retry: (count, err) => !isNoAccessError(err) && count < 1,
     queryFn: async () => {
       const created = await initializeWorkspace();
       // Оновлюємо всі списки, крім самого запиту ініціалізації (інакше він чекав би сам на себе).
@@ -322,6 +346,8 @@ export function AppLayout() {
               <Loader2 className="size-6 animate-spin" />
               <p>Готуємо ваш кабінет…</p>
             </div>
+          ) : init.isError && isNoAccessError(init.error) ? (
+            <NoAccess />
           ) : init.isError ? (
             <ErrorState error={init.error} onRetry={() => init.refetch()} />
           ) : (

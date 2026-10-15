@@ -11,7 +11,7 @@
 -- =====================================================================
 
 -- ---------- Допоміжна функція: оновлення updated_at -------------------
-create or replace function public.set_updated_at()
+create or replace function public.pth_set_updated_at()
 returns trigger
 language plpgsql
 set search_path = ''
@@ -25,7 +25,9 @@ end;
 $$;
 
 -- ---------- Профілі ----------------------------------------------------
-create table public.profiles (
+-- Профіль створюється функцією pth_initialize_workspace() під час першого входу
+-- (тригер на auth.users навмисно не використовується — проєкт спільний з іншими застосунками).
+create table public.pth_profiles (
   id             uuid primary key references auth.users (id) on delete cascade,
   display_name   text check (display_name is null or char_length(display_name) <= 120),
   initialized_at timestamptz,
@@ -34,7 +36,7 @@ create table public.profiles (
 );
 
 -- ---------- Класи ------------------------------------------------------
-create table public.classes (
+create table public.pth_classes (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
   title      text not null check (char_length(btrim(title)) between 1 and 120),
@@ -45,7 +47,7 @@ create table public.classes (
 );
 
 -- ---------- Розділи ----------------------------------------------------
-create table public.sections (
+create table public.pth_sections (
   id          uuid primary key default gen_random_uuid(),
   owner_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
   class_id    uuid not null,
@@ -56,13 +58,13 @@ create table public.sections (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (id, owner_id),
-  foreign key (class_id, owner_id) references public.classes (id, owner_id) on delete cascade
+  foreign key (class_id, owner_id) references public.pth_classes (id, owner_id) on delete cascade
 );
 -- Лише один «поточний розділ» на користувача.
-create unique index sections_one_current_per_owner on public.sections (owner_id) where is_current;
+create unique index pth_sections_one_current_per_owner on public.pth_sections (owner_id) where is_current;
 
 -- ---------- Теми -------------------------------------------------------
-create table public.topics (
+create table public.pth_topics (
   id          uuid primary key default gen_random_uuid(),
   owner_id    uuid not null default auth.uid() references auth.users (id) on delete cascade,
   section_id  uuid not null,
@@ -74,11 +76,11 @@ create table public.topics (
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
   unique (id, owner_id),
-  foreign key (section_id, owner_id) references public.sections (id, owner_id) on delete cascade
+  foreign key (section_id, owner_id) references public.pth_sections (id, owner_id) on delete cascade
 );
 
 -- ---------- Огляд і теорія теми (1:1) ----------------------------------
-create table public.topic_content (
+create table public.pth_topic_content (
   topic_id     uuid primary key,
   owner_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
   summary      text not null default '' check (char_length(summary) <= 10000),
@@ -88,12 +90,12 @@ create table public.topic_content (
   theory_html  text not null default '' check (char_length(theory_html) <= 500000),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
-  foreign key (topic_id, owner_id) references public.topics (id, owner_id) on delete cascade
+  foreign key (topic_id, owner_id) references public.pth_topics (id, owner_id) on delete cascade
 );
 
 -- ---------- Матеріали --------------------------------------------------
 -- topic_id = NULL означає «Скарбничка матеріалів» (нерозподілене).
-create table public.materials (
+create table public.pth_materials (
   id            uuid primary key default gen_random_uuid(),
   owner_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
   topic_id      uuid,
@@ -113,16 +115,16 @@ create table public.materials (
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   -- Зовнішні ресурси мусять мати URL; письмові (тест, конспект тощо) — ні.
-  constraint materials_url_required check (
+  constraint pth_materials_url_required check (
     url is not null
     or type in ('experiment','test','control_work','formula','summary','other')
   ),
   -- При видаленні теми матеріал НЕ зникає, а переходить у Скарбничку.
-  foreign key (topic_id, owner_id) references public.topics (id, owner_id) on delete set null (topic_id)
+  foreign key (topic_id, owner_id) references public.pth_topics (id, owner_id) on delete set null (topic_id)
 );
 
 -- ---------- Формули ----------------------------------------------------
-create table public.formulas (
+create table public.pth_formulas (
   id             uuid primary key default gen_random_uuid(),
   owner_id       uuid not null default auth.uid() references auth.users (id) on delete cascade,
   topic_id       uuid,
@@ -136,11 +138,11 @@ create table public.formulas (
   sort_order     integer not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now(),
-  foreign key (topic_id, owner_id) references public.topics (id, owner_id) on delete set null (topic_id)
+  foreign key (topic_id, owner_id) references public.pth_topics (id, owner_id) on delete set null (topic_id)
 );
 
 -- ---------- Нотатки вчителя (приватні) ---------------------------------
-create table public.notes (
+create table public.pth_notes (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
   topic_id   uuid not null,
@@ -148,11 +150,11 @@ create table public.notes (
   body_html  text not null default '' check (char_length(body_html) <= 200000),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  foreign key (topic_id, owner_id) references public.topics (id, owner_id) on delete cascade
+  foreign key (topic_id, owner_id) references public.pth_topics (id, owner_id) on delete cascade
 );
 
 -- ---------- Вбудовані квізи --------------------------------------------
-create table public.quizzes (
+create table public.pth_quizzes (
   id                uuid primary key default gen_random_uuid(),
   owner_id          uuid not null default auth.uid() references auth.users (id) on delete cascade,
   topic_id          uuid,
@@ -164,11 +166,11 @@ create table public.quizzes (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
   unique (id, owner_id),
-  foreign key (topic_id, owner_id) references public.topics (id, owner_id) on delete set null (topic_id)
+  foreign key (topic_id, owner_id) references public.pth_topics (id, owner_id) on delete set null (topic_id)
 );
 
 -- Дані питання, які можна показувати учням (без правильних відповідей).
-create table public.quiz_questions (
+create table public.pth_quiz_questions (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
   quiz_id    uuid not null,
@@ -179,15 +181,15 @@ create table public.quiz_questions (
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint quiz_questions_mc_options check (
+  constraint pth_quiz_questions_mc_options check (
     qtype <> 'multiple_choice' or jsonb_array_length(options) between 2 and 6
   ),
   unique (id, owner_id),
-  foreign key (quiz_id, owner_id) references public.quizzes (id, owner_id) on delete cascade
+  foreign key (quiz_id, owner_id) references public.pth_quizzes (id, owner_id) on delete cascade
 );
 
 -- Ключі відповідей — окрема таблиця, яку НЕ завантажує режим проходження квізу.
-create table public.quiz_answer_keys (
+create table public.pth_quiz_answer_keys (
   question_id         uuid primary key,
   owner_id            uuid not null default auth.uid() references auth.users (id) on delete cascade,
   correct_option      integer check (correct_option is null or correct_option between 0 and 5),
@@ -198,93 +200,103 @@ create table public.quiz_answer_keys (
   explanation         text not null default '' check (char_length(explanation) <= 3000),
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now(),
-  foreign key (question_id, owner_id) references public.quiz_questions (id, owner_id) on delete cascade
+  foreign key (question_id, owner_id) references public.pth_quiz_questions (id, owner_id) on delete cascade
 );
 
 -- ---------- Індекси ----------------------------------------------------
-create index classes_owner_idx        on public.classes (owner_id, sort_order);
-create index sections_owner_idx       on public.sections (owner_id);
-create index sections_class_idx       on public.sections (class_id, sort_order);
-create index topics_owner_idx         on public.topics (owner_id);
-create index topics_section_idx       on public.topics (section_id, sort_order);
-create index topic_content_owner_idx  on public.topic_content (owner_id);
-create index materials_owner_idx      on public.materials (owner_id, created_at desc);
-create index materials_topic_idx      on public.materials (topic_id);
-create index materials_type_idx       on public.materials (owner_id, type);
-create index materials_tags_idx       on public.materials using gin (tags);
-create index materials_fav_idx        on public.materials (owner_id) where is_favorite;
-create index formulas_owner_idx       on public.formulas (owner_id);
-create index formulas_topic_idx       on public.formulas (topic_id);
-create index notes_owner_idx          on public.notes (owner_id);
-create index notes_topic_idx          on public.notes (topic_id);
-create index quizzes_owner_idx        on public.quizzes (owner_id);
-create index quizzes_topic_idx        on public.quizzes (topic_id);
-create index quiz_questions_quiz_idx  on public.quiz_questions (quiz_id, sort_order);
-create index quiz_questions_owner_idx on public.quiz_questions (owner_id);
-create index quiz_keys_owner_idx      on public.quiz_answer_keys (owner_id);
+create index pth_classes_owner_idx        on public.pth_classes (owner_id, sort_order);
+create index pth_sections_owner_idx       on public.pth_sections (owner_id);
+create index pth_sections_class_idx       on public.pth_sections (class_id, sort_order);
+create index pth_topics_owner_idx         on public.pth_topics (owner_id);
+create index pth_topics_section_idx       on public.pth_topics (section_id, sort_order);
+create index pth_topic_content_owner_idx  on public.pth_topic_content (owner_id);
+create index pth_materials_owner_idx      on public.pth_materials (owner_id, created_at desc);
+create index pth_materials_topic_idx      on public.pth_materials (topic_id);
+create index pth_materials_type_idx       on public.pth_materials (owner_id, type);
+create index pth_materials_tags_idx       on public.pth_materials using gin (tags);
+create index pth_materials_fav_idx        on public.pth_materials (owner_id) where is_favorite;
+create index pth_formulas_owner_idx       on public.pth_formulas (owner_id);
+create index pth_formulas_topic_idx       on public.pth_formulas (topic_id);
+create index pth_notes_owner_idx          on public.pth_notes (owner_id);
+create index pth_notes_topic_idx          on public.pth_notes (topic_id);
+create index pth_quizzes_owner_idx        on public.pth_quizzes (owner_id);
+create index pth_quizzes_topic_idx        on public.pth_quizzes (topic_id);
+create index pth_quiz_questions_quiz_idx  on public.pth_quiz_questions (quiz_id, sort_order);
+create index pth_quiz_questions_owner_idx on public.pth_quiz_questions (owner_id);
+create index pth_quiz_keys_owner_idx      on public.pth_quiz_answer_keys (owner_id);
 
 -- ---------- Тригери updated_at -----------------------------------------
 do $$
 declare t text;
 begin
-  foreach t in array array['profiles','classes','sections','topics','topic_content','materials',
-                           'formulas','notes','quizzes','quiz_questions','quiz_answer_keys']
+  foreach t in array array['pth_profiles','pth_classes','pth_sections','pth_topics','pth_topic_content','pth_materials',
+                           'pth_formulas','pth_notes','pth_quizzes','pth_quiz_questions','pth_quiz_answer_keys']
   loop
     execute format(
-      'create trigger %I before update on public.%I for each row execute function public.set_updated_at()',
+      'create trigger %I before update on public.%I for each row execute function public.pth_set_updated_at()',
       t || '_set_updated_at', t);
   end loop;
 end;
 $$;
 
--- ---------- Профіль для кожного нового користувача ---------------------
-create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
+-- ---------- Необов'язкове обмеження доступу за email ------------------
+-- Поки таблиця порожня, застосунком може користуватися будь-який акаунт проєкту
+-- (кожен бачить лише власні дані). Щоб дозволити вхід лише собі, виконайте:
+--   insert into public.pth_allowed_emails (email) values ('ваш@email.com');
+-- Таблиця недоступна з браузера (RLS без політик) — змінюється лише в SQL Editor.
+create table public.pth_allowed_emails (
+  email      text primary key check (email = lower(btrim(email)) and position('@' in email) > 1),
+  created_at timestamptz not null default now()
+);
+alter table public.pth_allowed_emails enable row level security;
+revoke all on table public.pth_allowed_emails from anon, authenticated;
+
+create or replace function public.pth_has_access()
+returns boolean
+language sql
+stable
 security definer
 set search_path = ''
 as $$
-begin
-  insert into public.profiles (id) values (new.id) on conflict (id) do nothing;
-  return new;
-end;
+  select not exists (select 1 from public.pth_allowed_emails)
+      or exists (
+           select 1 from public.pth_allowed_emails
+            where email = lower(coalesce(auth.jwt() ->> 'email', ''))
+         );
 $$;
-revoke all on function public.handle_new_user() from public, anon, authenticated;
-
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+revoke all on function public.pth_has_access() from public, anon;
+grant execute on function public.pth_has_access() to authenticated;
 
 -- ---------- Row Level Security -----------------------------------------
-alter table public.profiles enable row level security;
+alter table public.pth_profiles enable row level security;
 
-create policy profiles_select_own on public.profiles
-  for select to authenticated using (id = (select auth.uid()));
-create policy profiles_insert_own on public.profiles
-  for insert to authenticated with check (id = (select auth.uid()));
-create policy profiles_update_own on public.profiles
-  for update to authenticated using (id = (select auth.uid())) with check (id = (select auth.uid()));
--- Видалення профілю — лише разом з акаунтом (каскадно), тому DELETE-політики немає.
+create policy pth_profiles_select_own on public.pth_profiles
+  for select to authenticated using (id = (select auth.uid()) and (select public.pth_has_access()));
+create policy pth_profiles_insert_own on public.pth_profiles
+  for insert to authenticated with check (id = (select auth.uid()) and (select public.pth_has_access()));
+create policy pth_profiles_update_own on public.pth_profiles
+  for update to authenticated using (id = (select auth.uid()) and (select public.pth_has_access())) with check (id = (select auth.uid()) and (select public.pth_has_access()));
+-- Видалення профілю — лише разом з акаунтом (каскадно) або скриптом видалення, тому DELETE-політики немає.
 
 do $$
 declare t text;
 begin
-  foreach t in array array['classes','sections','topics','topic_content','materials',
-                           'formulas','notes','quizzes','quiz_questions','quiz_answer_keys']
+  foreach t in array array['pth_classes','pth_sections','pth_topics','pth_topic_content','pth_materials',
+                           'pth_formulas','pth_notes','pth_quizzes','pth_quiz_questions','pth_quiz_answer_keys']
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I force row level security', t);
     execute format(
-      'create policy %I on public.%I for select to authenticated using (owner_id = (select auth.uid()))',
+      'create policy %I on public.%I for select to authenticated using (owner_id = (select auth.uid()) and (select public.pth_has_access()))',
       t || '_select_own', t);
     execute format(
-      'create policy %I on public.%I for insert to authenticated with check (owner_id = (select auth.uid()))',
+      'create policy %I on public.%I for insert to authenticated with check (owner_id = (select auth.uid()) and (select public.pth_has_access()))',
       t || '_insert_own', t);
     execute format(
-      'create policy %I on public.%I for update to authenticated using (owner_id = (select auth.uid())) with check (owner_id = (select auth.uid()))',
+      'create policy %I on public.%I for update to authenticated using (owner_id = (select auth.uid()) and (select public.pth_has_access())) with check (owner_id = (select auth.uid()) and (select public.pth_has_access()))',
       t || '_update_own', t);
     execute format(
-      'create policy %I on public.%I for delete to authenticated using (owner_id = (select auth.uid()))',
+      'create policy %I on public.%I for delete to authenticated using (owner_id = (select auth.uid()) and (select public.pth_has_access()))',
       t || '_delete_own', t);
     -- Анонімні відвідувачі не мають жодного доступу до даних.
     execute format('revoke all on table public.%I from anon', t);
@@ -293,5 +305,5 @@ begin
 end;
 $$;
 
-revoke all on table public.profiles from anon;
-grant select, insert, update on table public.profiles to authenticated;
+revoke all on table public.pth_profiles from anon;
+grant select, insert, update on table public.pth_profiles to authenticated;

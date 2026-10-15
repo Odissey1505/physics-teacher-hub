@@ -20,6 +20,11 @@ interface PgLikeError {
   hint?: string | null;
 }
 
+/** Акаунт не входить до списку дозволених (pth_allowed_emails). */
+export function isNoAccessError(err: unknown) {
+  return (err as PgLikeError | null)?.message === "PTH_NO_ACCESS";
+}
+
 /** Перетворює помилку Supabase/мережі на зрозуміле українське повідомлення. */
 export function humanizeError(err: unknown): string {
   if (!err) return "Сталася невідома помилка.";
@@ -27,6 +32,9 @@ export function humanizeError(err: unknown): string {
   const e = err as PgLikeError & { name?: string; status?: number };
   const msg = e.message ?? String(err);
 
+  if (isNoAccessError(err)) {
+    return "Цей акаунт не має доступу до Physics Teacher Hub.";
+  }
   if (/Failed to fetch|NetworkError|Load failed|network/i.test(msg)) {
     return "Немає з'єднання з сервером. Перевірте інтернет і спробуйте ще раз — введені дані збережено у формі.";
   }
@@ -41,10 +49,11 @@ export function humanizeError(err: unknown): string {
   if (e.code === "23514") return "Дані не пройшли перевірку бази даних (занадто довгий текст або некоректне значення).";
   if (e.code === "23505") return "Такий запис уже існує.";
   if (e.code === "PGRST202" || /Could not find the function/i.test(msg)) {
-    return "У базі даних немає потрібної функції. Перевірте, чи виконано обидві SQL-міграції.";
+    // supabase-js повертає це, якщо SQL-міграцію не виконано в цьому проєкті Supabase.
+    return "У базі даних немає функцій Physics Teacher Hub. Виконайте файл supabase/physics-teacher-hub-SQL.sql у Supabase → SQL Editor.";
   }
   if (e.code === "42P01" || /relation .* does not exist|Could not find the table/i.test(msg)) {
-    return "У базі даних немає потрібних таблиць. Виконайте SQL-міграції з папки supabase/migrations.";
+    return "У базі даних немає таблиць Physics Teacher Hub. Виконайте файл supabase/physics-teacher-hub-SQL.sql у Supabase → SQL Editor.";
   }
   if (/Invalid login credentials/i.test(msg)) return "Невірний email або пароль.";
   if (/Email not confirmed/i.test(msg)) return "Email ще не підтверджено. Перевірте пошту (і папку «Спам»).";

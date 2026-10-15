@@ -8,10 +8,10 @@
 
 -- ---------- 1. Початкове наповнення (ідемпотентне) ---------------------
 -- Створює «9 клас → Розділ 1 → 15 тем» рівно один раз на акаунт.
--- Позначка profiles.initialized_at гарантує, що повторний вхід, оновлення
+-- Позначка pth_profiles.initialized_at гарантує, що повторний вхід, оновлення
 -- сторінки чи видалення тем НЕ створять дані знову. FOR UPDATE блокує
 -- одночасні виклики з двох вкладок.
-create or replace function public.initialize_workspace()
+create or replace function public.pth_initialize_workspace()
 returns boolean
 language plpgsql
 security invoker
@@ -44,36 +44,40 @@ begin
   if v_uid is null then
     raise exception 'Потрібна авторизація' using errcode = '28000';
   end if;
+  if not public.pth_has_access() then
+    raise exception 'PTH_NO_ACCESS' using errcode = '42501',
+      hint = 'Цей акаунт не має доступу до Physics Teacher Hub.';
+  end if;
 
-  insert into profiles (id) values (v_uid) on conflict (id) do nothing;
-  select initialized_at into v_done from profiles where id = v_uid for update;
+  insert into pth_profiles (id) values (v_uid) on conflict (id) do nothing;
+  select initialized_at into v_done from pth_profiles where id = v_uid for update;
 
   if v_done is not null then
     return false; -- уже ініціалізовано раніше
   end if;
 
-  insert into classes (owner_id, title, sort_order)
+  insert into pth_classes (owner_id, title, sort_order)
   values (v_uid, '9 клас', 0)
   returning id into v_class;
 
-  insert into sections (owner_id, class_id, title, description, sort_order, is_current)
+  insert into pth_sections (owner_id, class_id, title, description, sort_order, is_current)
   values (v_uid, v_class, 'Розділ 1. Електромагнітні явища',
           'Магнітне поле, його дія на провідники зі струмом і рухомі заряди, електромагніти, електродвигуни та електромагнітна індукція.',
           0, true)
   returning id into v_section;
 
   for i in 1 .. array_length(v_titles, 1) loop
-    insert into topics (owner_id, section_id, title, sort_order)
+    insert into pth_topics (owner_id, section_id, title, sort_order)
     values (v_uid, v_section, v_titles[i], i - 1);
   end loop;
 
-  update profiles set initialized_at = now() where id = v_uid;
+  update pth_profiles set initialized_at = now() where id = v_uid;
   return true;
 end;
 $$;
 
 -- ---------- 2. Сортування (drag-and-drop) ------------------------------
-create or replace function public.reorder_items(p_kind text, p_ids uuid[])
+create or replace function public.pth_reorder_items(p_kind text, p_ids uuid[])
 returns void
 language plpgsql
 security invoker
@@ -84,16 +88,16 @@ begin
     raise exception 'Потрібна авторизація' using errcode = '28000';
   end if;
   if p_kind = 'topics' then
-    update topics t set sort_order = x.ord - 1
+    update pth_topics t set sort_order = x.ord - 1
       from unnest(p_ids) with ordinality as x(id, ord) where t.id = x.id;
   elsif p_kind = 'sections' then
-    update sections t set sort_order = x.ord - 1
+    update pth_sections t set sort_order = x.ord - 1
       from unnest(p_ids) with ordinality as x(id, ord) where t.id = x.id;
   elsif p_kind = 'classes' then
-    update classes t set sort_order = x.ord - 1
+    update pth_classes t set sort_order = x.ord - 1
       from unnest(p_ids) with ordinality as x(id, ord) where t.id = x.id;
   elsif p_kind = 'quiz_questions' then
-    update quiz_questions t set sort_order = x.ord - 1
+    update pth_quiz_questions t set sort_order = x.ord - 1
       from unnest(p_ids) with ordinality as x(id, ord) where t.id = x.id;
   else
     raise exception 'Невідомий тип сортування: %', p_kind;
@@ -102,18 +106,18 @@ end;
 $$;
 
 -- ---------- 3. Поточний розділ ----------------------------------------
-create or replace function public.set_current_section(p_section_id uuid)
+create or replace function public.pth_set_current_section(p_section_id uuid)
 returns void
 language plpgsql
 security invoker
 set search_path = public
 as $$
 begin
-  if not exists (select 1 from sections where id = p_section_id) then
+  if not exists (select 1 from pth_sections where id = p_section_id) then
     raise exception 'Розділ не знайдено';
   end if;
-  update sections set is_current = false where is_current and id <> p_section_id;
-  update sections set is_current = true where id = p_section_id;
+  update pth_sections set is_current = false where is_current and id <> p_section_id;
+  update pth_sections set is_current = true where id = p_section_id;
 end;
 $$;
 
@@ -122,7 +126,7 @@ $$;
 --                   залишаються в загальних списках без прив'язки до теми;
 --                   теорія та нотатки тем видаляються.
 -- p_mode = 'all':   додатково видаляються матеріали, формули та квізи цих тем.
-create or replace function public.delete_container(p_kind text, p_id uuid, p_mode text)
+create or replace function public.pth_delete_container(p_kind text, p_id uuid, p_mode text)
 returns jsonb
 language plpgsql
 security invoker
@@ -142,32 +146,32 @@ begin
   end if;
 
   if p_kind = 'topic' then
-    select array_agg(id) into v_topics from topics where id = p_id;
+    select array_agg(id) into v_topics from pth_topics where id = p_id;
   elsif p_kind = 'section' then
-    select array_agg(id) into v_topics from topics where section_id = p_id;
+    select array_agg(id) into v_topics from pth_topics where section_id = p_id;
   elsif p_kind = 'class' then
     select array_agg(t.id) into v_topics
-      from topics t join sections s on s.id = t.section_id where s.class_id = p_id;
+      from pth_topics t join pth_sections s on s.id = t.section_id where s.class_id = p_id;
   else
     raise exception 'Невідомий тип: %', p_kind;
   end if;
   v_topics := coalesce(v_topics, '{}');
 
   if p_mode = 'all' then
-    delete from materials where topic_id = any (v_topics);
+    delete from pth_materials where topic_id = any (v_topics);
     get diagnostics v_materials = row_count;
-    delete from formulas where topic_id = any (v_topics);
+    delete from pth_formulas where topic_id = any (v_topics);
     get diagnostics v_formulas = row_count;
-    delete from quizzes where topic_id = any (v_topics);
+    delete from pth_quizzes where topic_id = any (v_topics);
     get diagnostics v_quizzes = row_count;
   end if;
 
   if p_kind = 'topic' then
-    delete from topics where id = p_id;
+    delete from pth_topics where id = p_id;
   elsif p_kind = 'section' then
-    delete from sections where id = p_id;
+    delete from pth_sections where id = p_id;
   else
-    delete from classes where id = p_id;
+    delete from pth_classes where id = p_id;
   end if;
   if not found then
     raise exception 'Запис не знайдено або немає доступу';
@@ -180,104 +184,104 @@ end;
 $$;
 
 -- ---------- 5. Копіювання квізу (з питаннями та ключами) -----------------
-create or replace function public.copy_quiz_internal(p_quiz_id uuid, p_topic_id uuid, p_title text)
+create or replace function public.pth_copy_quiz_internal(p_quiz_id uuid, p_topic_id uuid, p_title text)
 returns uuid
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
-  v_quiz quizzes%rowtype;
+  v_quiz pth_quizzes%rowtype;
   v_new  uuid := gen_random_uuid();
-  v_q    quiz_questions%rowtype;
+  v_q    pth_quiz_questions%rowtype;
   v_nq   uuid;
 begin
-  select * into v_quiz from quizzes where id = p_quiz_id;
+  select * into v_quiz from pth_quizzes where id = p_quiz_id;
   if not found then
     raise exception 'Квіз не знайдено';
   end if;
 
-  insert into quizzes (id, owner_id, topic_id, title, description, reveal_mode, show_explanations)
+  insert into pth_quizzes (id, owner_id, topic_id, title, description, reveal_mode, show_explanations)
   values (v_new, v_quiz.owner_id, p_topic_id, left(p_title, 200), v_quiz.description,
           v_quiz.reveal_mode, v_quiz.show_explanations);
 
-  for v_q in select * from quiz_questions where quiz_id = p_quiz_id order by sort_order loop
+  for v_q in select * from pth_quiz_questions where quiz_id = p_quiz_id order by sort_order loop
     v_nq := gen_random_uuid();
-    insert into quiz_questions (id, owner_id, quiz_id, qtype, prompt, options, image_url, sort_order)
+    insert into pth_quiz_questions (id, owner_id, quiz_id, qtype, prompt, options, image_url, sort_order)
     values (v_nq, v_q.owner_id, v_new, v_q.qtype, v_q.prompt, v_q.options, v_q.image_url, v_q.sort_order);
 
-    insert into quiz_answer_keys (question_id, owner_id, correct_option, correct_bool, accepted_answers,
+    insert into pth_quiz_answer_keys (question_id, owner_id, correct_option, correct_bool, accepted_answers,
                                   case_sensitive, ignore_extra_spaces, explanation)
     select v_nq, owner_id, correct_option, correct_bool, accepted_answers,
            case_sensitive, ignore_extra_spaces, explanation
-      from quiz_answer_keys where question_id = v_q.id;
+      from pth_quiz_answer_keys where question_id = v_q.id;
   end loop;
 
   return v_new;
 end;
 $$;
-revoke all on function public.copy_quiz_internal(uuid, uuid, text) from public, anon;
+revoke all on function public.pth_copy_quiz_internal(uuid, uuid, text) from public, anon;
 
-create or replace function public.duplicate_quiz(p_quiz_id uuid)
+create or replace function public.pth_duplicate_quiz(p_quiz_id uuid)
 returns uuid
 language plpgsql
 security invoker
 set search_path = public
 as $$
-declare v_quiz quizzes%rowtype;
+declare v_quiz pth_quizzes%rowtype;
 begin
-  select * into v_quiz from quizzes where id = p_quiz_id;
+  select * into v_quiz from pth_quizzes where id = p_quiz_id;
   if not found then
     raise exception 'Квіз не знайдено';
   end if;
-  return copy_quiz_internal(p_quiz_id, v_quiz.topic_id, v_quiz.title || ' (копія)');
+  return pth_copy_quiz_internal(p_quiz_id, v_quiz.topic_id, v_quiz.title || ' (копія)');
 end;
 $$;
 
 -- ---------- 6. Дублювання теми з усім вмістом ----------------------------
-create or replace function public.duplicate_topic(p_topic_id uuid)
+create or replace function public.pth_duplicate_topic(p_topic_id uuid)
 returns uuid
 language plpgsql
 security invoker
 set search_path = public
 as $$
 declare
-  v_t   topics%rowtype;
+  v_t   pth_topics%rowtype;
   v_new uuid := gen_random_uuid();
   v_qz  record;
 begin
-  select * into v_t from topics where id = p_topic_id;
+  select * into v_t from pth_topics where id = p_topic_id;
   if not found then
     raise exception 'Тему не знайдено';
   end if;
 
-  update topics set sort_order = sort_order + 1
+  update pth_topics set sort_order = sort_order + 1
    where section_id = v_t.section_id and sort_order > v_t.sort_order;
 
-  insert into topics (id, owner_id, section_id, title, description, icon, image_url, sort_order)
+  insert into pth_topics (id, owner_id, section_id, title, description, icon, image_url, sort_order)
   values (v_new, v_t.owner_id, v_t.section_id, left(v_t.title || ' (копія)', 300),
           v_t.description, v_t.icon, v_t.image_url, v_t.sort_order + 1);
 
-  insert into topic_content (topic_id, owner_id, summary, key_concepts, definitions, objectives, theory_html)
+  insert into pth_topic_content (topic_id, owner_id, summary, key_concepts, definitions, objectives, theory_html)
   select v_new, owner_id, summary, key_concepts, definitions, objectives, theory_html
-    from topic_content where topic_id = p_topic_id;
+    from pth_topic_content where topic_id = p_topic_id;
 
-  insert into materials (owner_id, topic_id, type, title, url, description, provider, thumbnail_url,
+  insert into pth_materials (owner_id, topic_id, type, title, url, description, provider, thumbnail_url,
                          content_html, tags, visibility, is_favorite, sort_order)
   select owner_id, v_new, type, title, url, description, provider, thumbnail_url,
          content_html, tags, visibility, false, sort_order
-    from materials where topic_id = p_topic_id;
+    from pth_materials where topic_id = p_topic_id;
 
-  insert into formulas (owner_id, topic_id, name, latex, explanation, quantities, units, example,
+  insert into pth_formulas (owner_id, topic_id, name, latex, explanation, quantities, units, example,
                         calculator_key, sort_order)
   select owner_id, v_new, name, latex, explanation, quantities, units, example, calculator_key, sort_order
-    from formulas where topic_id = p_topic_id;
+    from pth_formulas where topic_id = p_topic_id;
 
-  insert into notes (owner_id, topic_id, title, body_html)
-  select owner_id, v_new, title, body_html from notes where topic_id = p_topic_id;
+  insert into pth_notes (owner_id, topic_id, title, body_html)
+  select owner_id, v_new, title, body_html from pth_notes where topic_id = p_topic_id;
 
-  for v_qz in select id, title from quizzes where topic_id = p_topic_id loop
-    perform copy_quiz_internal(v_qz.id, v_new, v_qz.title);
+  for v_qz in select id, title from pth_quizzes where topic_id = p_topic_id loop
+    perform pth_copy_quiz_internal(v_qz.id, v_new, v_qz.title);
   end loop;
 
   return v_new;
@@ -292,7 +296,7 @@ $$;
 --   * case_sensitive = false: регістр не враховується;
 --   * апострофи ’ ʼ ` прирівнюються до ';
 --   * відповідь має ТОЧНО збігтися з одним із допустимих варіантів.
-create or replace function public.normalize_short_answer(p_text text, p_case boolean, p_spaces boolean)
+create or replace function public.pth_normalize_short_answer(p_text text, p_case boolean, p_spaces boolean)
 returns text
 language sql
 immutable
@@ -307,7 +311,7 @@ as $$
   ) s;
 $$;
 
-create or replace function public.grade_quiz_answer(p_question_id uuid, p_answer jsonb)
+create or replace function public.pth_grade_quiz_answer(p_question_id uuid, p_answer jsonb)
 returns jsonb
 language plpgsql
 security invoker
@@ -316,16 +320,16 @@ as $$
 declare
   v_type    text;
   v_options jsonb;
-  v_key     quiz_answer_keys%rowtype;
+  v_key     pth_quiz_answer_keys%rowtype;
   v_correct boolean := false;
   v_answer_text text;
   v_display text;
 begin
-  select q.qtype, q.options into v_type, v_options from quiz_questions q where q.id = p_question_id;
+  select q.qtype, q.options into v_type, v_options from pth_quiz_questions q where q.id = p_question_id;
   if not found then
     raise exception 'Питання не знайдено';
   end if;
-  select * into v_key from quiz_answer_keys where question_id = p_question_id;
+  select * into v_key from pth_quiz_answer_keys where question_id = p_question_id;
   if not found then
     raise exception 'Для цього питання не задано правильну відповідь';
   end if;
@@ -342,10 +346,10 @@ begin
     v_display := case when v_key.correct_bool then 'Правда' else 'Неправда' end;
   else
     if jsonb_typeof(p_answer) = 'string' then
-      v_answer_text := normalize_short_answer(p_answer #>> '{}', v_key.case_sensitive, v_key.ignore_extra_spaces);
+      v_answer_text := pth_normalize_short_answer(p_answer #>> '{}', v_key.case_sensitive, v_key.ignore_extra_spaces);
       v_correct := v_answer_text <> '' and exists (
         select 1 from unnest(v_key.accepted_answers) a
-         where normalize_short_answer(a, v_key.case_sensitive, v_key.ignore_extra_spaces) = v_answer_text
+         where pth_normalize_short_answer(a, v_key.case_sensitive, v_key.ignore_extra_spaces) = v_answer_text
       );
     end if;
     v_display := array_to_string(v_key.accepted_answers, ' / ');
@@ -364,7 +368,7 @@ $$;
 -- p_key:      { correct_option?, correct_bool?, accepted_answers?, case_sensitive?,
 --               ignore_extra_spaces?, explanation? }
 -- Якщо передано updated_at і запис змінено на іншому пристрої — помилка CONFLICT.
-create or replace function public.save_quiz_question(p_quiz_id uuid, p_question jsonb, p_key jsonb)
+create or replace function public.pth_save_quiz_question(p_quiz_id uuid, p_question jsonb, p_key jsonb)
 returns jsonb
 language plpgsql
 security invoker
@@ -374,7 +378,7 @@ declare
   v_id      uuid := nullif(p_question ->> 'id', '')::uuid;
   v_type    text := p_question ->> 'qtype';
   v_options jsonb := coalesce(p_question -> 'options', '[]'::jsonb);
-  v_row     quiz_questions%rowtype;
+  v_row     pth_quiz_questions%rowtype;
   v_opt     integer := (p_key ->> 'correct_option')::int;
   v_bool    boolean := (p_key ->> 'correct_bool')::boolean;
   v_acc     text[] := coalesce(array(
@@ -384,7 +388,7 @@ begin
   if auth.uid() is null then
     raise exception 'Потрібна авторизація' using errcode = '28000';
   end if;
-  if not exists (select 1 from quizzes where id = p_quiz_id) then
+  if not exists (select 1 from pth_quizzes where id = p_quiz_id) then
     raise exception 'Квіз не знайдено';
   end if;
   if v_type = 'multiple_choice' then
@@ -406,19 +410,19 @@ begin
   end if;
 
   if v_id is null then
-    insert into quiz_questions (quiz_id, qtype, prompt, options, image_url, sort_order)
+    insert into pth_quiz_questions (quiz_id, qtype, prompt, options, image_url, sort_order)
     values (p_quiz_id, v_type, p_question ->> 'prompt', v_options, nullif(p_question ->> 'image_url', ''),
-            coalesce((select max(sort_order) + 1 from quiz_questions where quiz_id = p_quiz_id), 0))
+            coalesce((select max(sort_order) + 1 from pth_quiz_questions where quiz_id = p_quiz_id), 0))
     returning * into v_row;
   else
-    update quiz_questions
+    update pth_quiz_questions
        set qtype = v_type, prompt = p_question ->> 'prompt', options = v_options,
            image_url = nullif(p_question ->> 'image_url', '')
      where id = v_id and quiz_id = p_quiz_id
        and (p_question ->> 'updated_at' is null or updated_at = (p_question ->> 'updated_at')::timestamptz)
     returning * into v_row;
     if not found then
-      if exists (select 1 from quiz_questions where id = v_id) then
+      if exists (select 1 from pth_quiz_questions where id = v_id) then
         raise exception 'CONFLICT' using errcode = '40001',
           hint = 'Питання змінено на іншому пристрої. Оновіть сторінку.';
       end if;
@@ -426,7 +430,7 @@ begin
     end if;
   end if;
 
-  insert into quiz_answer_keys (question_id, correct_option, correct_bool, accepted_answers,
+  insert into pth_quiz_answer_keys (question_id, correct_option, correct_bool, accepted_answers,
                                 case_sensitive, ignore_extra_spaces, explanation)
   values (v_row.id,
           case when v_type = 'multiple_choice' then v_opt end,
@@ -452,7 +456,7 @@ $$;
 -- p_mode = 'replace' — спершу видаляє ВСІ дані користувача, потім імпортує.
 -- Будь-яка помилка скасовує весь імпорт (усе або нічого).
 -- owner_id з файлу ігнорується: усе належатиме поточному користувачу.
-create or replace function public.import_workspace(p_payload jsonb, p_mode text)
+create or replace function public.pth_import_workspace(p_payload jsonb, p_mode text)
 returns jsonb
 language plpgsql
 security invoker
@@ -488,18 +492,18 @@ begin
   end if;
 
   if p_mode = 'replace' then
-    delete from quizzes   where owner_id = v_uid;
-    delete from materials where owner_id = v_uid;
-    delete from formulas  where owner_id = v_uid;
-    delete from classes   where owner_id = v_uid; -- каскадно: розділи, теми, теорія, нотатки
+    delete from pth_quizzes   where owner_id = v_uid;
+    delete from pth_materials where owner_id = v_uid;
+    delete from pth_formulas  where owner_id = v_uid;
+    delete from pth_classes   where owner_id = v_uid; -- каскадно: розділи, теми, теорія, нотатки
   else
-    select exists (select 1 from sections where is_current) into v_has_current;
+    select exists (select 1 from pth_sections where is_current) into v_has_current;
   end if;
 
   -- Класи
   for r in select * from jsonb_array_elements(coalesce(d -> 'classes', '[]')) loop
     v_new := gen_random_uuid();
-    insert into classes (id, owner_id, title, sort_order)
+    insert into pth_classes (id, owner_id, title, sort_order)
     values (v_new, v_uid, r ->> 'title', coalesce((r ->> 'sort_order')::int, 0));
     m := m || jsonb_build_object(r ->> 'id', v_new);
     c_classes := c_classes + 1;
@@ -514,7 +518,7 @@ begin
     v_cur := coalesce((r ->> 'is_current')::boolean, false) and not v_has_current;
     if v_cur then v_has_current := true; end if;
     v_new := gen_random_uuid();
-    insert into sections (id, owner_id, class_id, title, description, sort_order, is_current)
+    insert into pth_sections (id, owner_id, class_id, title, description, sort_order, is_current)
     values (v_new, v_uid, v_ref, r ->> 'title', coalesce(r ->> 'description', ''),
             coalesce((r ->> 'sort_order')::int, 0), v_cur);
     m := m || jsonb_build_object(r ->> 'id', v_new);
@@ -528,7 +532,7 @@ begin
       raise exception 'Тема «%» посилається на відсутній розділ', r ->> 'title';
     end if;
     v_new := gen_random_uuid();
-    insert into topics (id, owner_id, section_id, title, description, icon, image_url, sort_order)
+    insert into pth_topics (id, owner_id, section_id, title, description, icon, image_url, sort_order)
     values (v_new, v_uid, v_ref, r ->> 'title', coalesce(r ->> 'description', ''),
             r ->> 'icon', r ->> 'image_url', coalesce((r ->> 'sort_order')::int, 0));
     m := m || jsonb_build_object(r ->> 'id', v_new);
@@ -541,7 +545,7 @@ begin
     if v_ref is null then
       raise exception 'Теорія посилається на відсутню тему';
     end if;
-    insert into topic_content (topic_id, owner_id, summary, key_concepts, definitions, objectives, theory_html)
+    insert into pth_topic_content (topic_id, owner_id, summary, key_concepts, definitions, objectives, theory_html)
     values (v_ref, v_uid, coalesce(r ->> 'summary', ''),
             coalesce(array(select jsonb_array_elements_text(coalesce(r -> 'key_concepts', '[]'))), '{}'),
             coalesce(r -> 'definitions', '[]'),
@@ -553,7 +557,7 @@ begin
   -- Матеріали (якщо тему не знайдено — матеріал іде у Скарбничку)
   for r in select * from jsonb_array_elements(coalesce(d -> 'materials', '[]')) loop
     v_ref := case when r ->> 'topic_id' is null then null else (m ->> (r ->> 'topic_id'))::uuid end;
-    insert into materials (owner_id, topic_id, type, title, url, description, provider, thumbnail_url,
+    insert into pth_materials (owner_id, topic_id, type, title, url, description, provider, thumbnail_url,
                            content_html, tags, visibility, is_favorite, sort_order)
     values (v_uid, v_ref, r ->> 'type', r ->> 'title', nullif(r ->> 'url', ''),
             coalesce(r ->> 'description', ''), r ->> 'provider', r ->> 'thumbnail_url',
@@ -568,7 +572,7 @@ begin
   -- Формули
   for r in select * from jsonb_array_elements(coalesce(d -> 'formulas', '[]')) loop
     v_ref := case when r ->> 'topic_id' is null then null else (m ->> (r ->> 'topic_id'))::uuid end;
-    insert into formulas (owner_id, topic_id, name, latex, explanation, quantities, units, example,
+    insert into pth_formulas (owner_id, topic_id, name, latex, explanation, quantities, units, example,
                           calculator_key, sort_order)
     values (v_uid, v_ref, r ->> 'name', r ->> 'latex', coalesce(r ->> 'explanation', ''),
             coalesce(r -> 'quantities', '[]'), coalesce(r ->> 'units', ''), coalesce(r ->> 'example', ''),
@@ -582,7 +586,7 @@ begin
     if v_ref is null then
       raise exception 'Нотатка «%» посилається на відсутню тему', r ->> 'title';
     end if;
-    insert into notes (owner_id, topic_id, title, body_html)
+    insert into pth_notes (owner_id, topic_id, title, body_html)
     values (v_uid, v_ref, r ->> 'title', coalesce(r ->> 'body_html', ''));
     c_notes := c_notes + 1;
   end loop;
@@ -591,7 +595,7 @@ begin
   for r in select * from jsonb_array_elements(coalesce(d -> 'quizzes', '[]')) loop
     v_ref := case when r ->> 'topic_id' is null then null else (m ->> (r ->> 'topic_id'))::uuid end;
     v_new := gen_random_uuid();
-    insert into quizzes (id, owner_id, topic_id, title, description, reveal_mode, show_explanations)
+    insert into pth_quizzes (id, owner_id, topic_id, title, description, reveal_mode, show_explanations)
     values (v_new, v_uid, v_ref, r ->> 'title', coalesce(r ->> 'description', ''),
             coalesce(r ->> 'reveal_mode', 'end'), coalesce((r ->> 'show_explanations')::boolean, true));
     m := m || jsonb_build_object(r ->> 'id', v_new);
@@ -605,7 +609,7 @@ begin
       raise exception 'Питання посилається на відсутній квіз';
     end if;
     v_new := gen_random_uuid();
-    insert into quiz_questions (id, owner_id, quiz_id, qtype, prompt, options, image_url, sort_order)
+    insert into pth_quiz_questions (id, owner_id, quiz_id, qtype, prompt, options, image_url, sort_order)
     values (v_new, v_uid, v_ref, r ->> 'qtype', r ->> 'prompt', coalesce(r -> 'options', '[]'),
             r ->> 'image_url', coalesce((r ->> 'sort_order')::int, 0));
     m := m || jsonb_build_object(r ->> 'id', v_new);
@@ -618,7 +622,7 @@ begin
     if v_ref is null then
       raise exception 'Ключ відповіді посилається на відсутнє питання';
     end if;
-    insert into quiz_answer_keys (question_id, owner_id, correct_option, correct_bool, accepted_answers,
+    insert into pth_quiz_answer_keys (question_id, owner_id, correct_option, correct_bool, accepted_answers,
                                   case_sensitive, ignore_extra_spaces, explanation)
     values (v_ref, v_uid, (r ->> 'correct_option')::int, (r ->> 'correct_bool')::boolean,
             coalesce(array(select jsonb_array_elements_text(coalesce(r -> 'accepted_answers', '[]'))), '{}'),
@@ -629,8 +633,8 @@ begin
   end loop;
 
   -- Після імпорту акаунт вважається ініціалізованим (щоб не з'явились дублікати тем).
-  insert into profiles (id, initialized_at) values (v_uid, now())
-  on conflict (id) do update set initialized_at = coalesce(profiles.initialized_at, now());
+  insert into pth_profiles (id, initialized_at) values (v_uid, now())
+  on conflict (id) do update set initialized_at = coalesce(pth_profiles.initialized_at, now());
 
   return jsonb_build_object(
     'classes', c_classes, 'sections', c_sections, 'topics', c_topics, 'topic_content', c_content,
@@ -641,24 +645,24 @@ end;
 $$;
 
 -- ---------- Права на виконання ----------------------------------------------
-revoke all on function public.initialize_workspace()                    from public, anon;
-revoke all on function public.reorder_items(text, uuid[])               from public, anon;
-revoke all on function public.set_current_section(uuid)                 from public, anon;
-revoke all on function public.delete_container(text, uuid, text)        from public, anon;
-revoke all on function public.duplicate_quiz(uuid)                      from public, anon;
-revoke all on function public.duplicate_topic(uuid)                     from public, anon;
-revoke all on function public.grade_quiz_answer(uuid, jsonb)            from public, anon;
-revoke all on function public.import_workspace(jsonb, text)             from public, anon;
-revoke all on function public.save_quiz_question(uuid, jsonb, jsonb)    from public, anon;
+revoke all on function public.pth_initialize_workspace()                    from public, anon;
+revoke all on function public.pth_reorder_items(text, uuid[])               from public, anon;
+revoke all on function public.pth_set_current_section(uuid)                 from public, anon;
+revoke all on function public.pth_delete_container(text, uuid, text)        from public, anon;
+revoke all on function public.pth_duplicate_quiz(uuid)                      from public, anon;
+revoke all on function public.pth_duplicate_topic(uuid)                     from public, anon;
+revoke all on function public.pth_grade_quiz_answer(uuid, jsonb)            from public, anon;
+revoke all on function public.pth_import_workspace(jsonb, text)             from public, anon;
+revoke all on function public.pth_save_quiz_question(uuid, jsonb, jsonb)    from public, anon;
 
-grant execute on function public.initialize_workspace()                 to authenticated;
-grant execute on function public.reorder_items(text, uuid[])            to authenticated;
-grant execute on function public.set_current_section(uuid)              to authenticated;
-grant execute on function public.delete_container(text, uuid, text)     to authenticated;
-grant execute on function public.copy_quiz_internal(uuid, uuid, text)   to authenticated;
-grant execute on function public.duplicate_quiz(uuid)                   to authenticated;
-grant execute on function public.duplicate_topic(uuid)                  to authenticated;
-grant execute on function public.grade_quiz_answer(uuid, jsonb)         to authenticated;
-grant execute on function public.import_workspace(jsonb, text)          to authenticated;
-grant execute on function public.save_quiz_question(uuid, jsonb, jsonb) to authenticated;
-grant execute on function public.normalize_short_answer(text, boolean, boolean) to authenticated;
+grant execute on function public.pth_initialize_workspace()                 to authenticated;
+grant execute on function public.pth_reorder_items(text, uuid[])            to authenticated;
+grant execute on function public.pth_set_current_section(uuid)              to authenticated;
+grant execute on function public.pth_delete_container(text, uuid, text)     to authenticated;
+grant execute on function public.pth_copy_quiz_internal(uuid, uuid, text)   to authenticated;
+grant execute on function public.pth_duplicate_quiz(uuid)                   to authenticated;
+grant execute on function public.pth_duplicate_topic(uuid)                  to authenticated;
+grant execute on function public.pth_grade_quiz_answer(uuid, jsonb)         to authenticated;
+grant execute on function public.pth_import_workspace(jsonb, text)          to authenticated;
+grant execute on function public.pth_save_quiz_question(uuid, jsonb, jsonb) to authenticated;
+grant execute on function public.pth_normalize_short_answer(text, boolean, boolean) to authenticated;
