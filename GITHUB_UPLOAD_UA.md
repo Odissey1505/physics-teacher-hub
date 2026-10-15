@@ -16,6 +16,7 @@
 | `package.json`, `package-lock.json` | папку `dist/` (результат збірки) |
 | `index.html`, `vite.config.ts`, `tsconfig.json`, `tsconfig.app.json`, `tsconfig.node.json`, `components.json` | паролі, service_role / secret ключі |
 | `.gitignore`, `.env.example` (лише шаблон без ключів) | |
+| папку `.github/` (файл `workflows/deploy.yml` — автоматична публікація) | |
 | `README.md`, `LOCAL_SETUP_UA.md`, `SUPABASE_SETUP_UA.md`, `GITHUB_UPLOAD_UA.md` | |
 
 Перед завантаженням відкрийте `.env.example` і переконайтеся, що там **шаблонні** значення (`YOUR-PROJECT-REF`, `YOUR-PUBLISHABLE-OR-ANON-KEY`), а не ваші справжні.
@@ -109,3 +110,14 @@ git push -u origin main
 ```
 
 Файл `.gitignore` автоматично не пропустить `node_modules`, `dist` і `.env.local`.
+
+---
+
+## Публікація сайту (GitHub Pages)
+
+1. **Settings → Pages → Build and deployment → Source: GitHub Actions** (не «Deploy from a branch»!).
+2. Переконайтеся, що в репозиторії є файл `.github/workflows/deploy.yml`. Папки з крапкою браузер часто пропускає — тоді створіть файл вручну: **Add file → Create new file**, у полі назви введіть `.github/workflows/deploy.yml` (скісні риски автоматично створять папки), вставте вміст файлу з архіву → **Commit changes**.
+3. Відкрийте вкладку **Actions**: збірка триває 1–2 хвилини. Зелена галочка — сайт опубліковано за адресою `https://ВАШ-ЛОГІН.github.io/НАЗВА-РЕПОЗИТОРІЮ/`.
+4. У Supabase → Authentication → URL Configuration → Redirect URLs додайте `https://ВАШ-ЛОГІН.github.io/НАЗВА-РЕПОЗИТОРІЮ/**`.
+
+Далі кожне завантаження коду в `main` автоматично оновлює сайт.

@@ -133,12 +133,15 @@ physics-teacher-hub/
 
 ---
 
-## Майбутня публікація (необов'язково)
+## Публікація на GitHub Pages
 
-- GitHub-репозиторій **лише зберігає** вихідний код.
-- GitHub Pages може згодом показувати **зібрану** статичну версію (вміст папки `dist/` після `npm run build`), а не сирий код React/TypeScript.
-- Supabase залишається бекендом — база даних і вхід працюють так само.
-- Застосунок уже готовий до цього: використовує HashRouter (адреси виду `…/#/topics/…`), відносні шляхи до ресурсів (`VITE_BASE_PATH`, за замовчуванням `./`), а посилання з листів Supabase обробляються до запуску маршрутизатора.
-- Після публікації додайте адресу сайту в Supabase → Authentication → URL Configuration (Site URL і Redirect URLs).
+Файл `.github/workflows/deploy.yml` автоматично збирає сайт (`npm ci` → `npm run build`) і публікує папку `dist/` після кожного коміту в гілку `main`.
 
-Зараз публікація **не налаштована і не виконується**: немає конфігурації Vercel, GitHub Actions чи інших автоматичних розгортань.
+1. Репозиторій → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Завантажте код (разом із `.github/workflows/deploy.yml` і `package-lock.json`). Хід збірки — на вкладці **Actions**.
+3. Сайт буде за адресою `https://ВАШ-ЛОГІН.github.io/НАЗВА-РЕПОЗИТОРІЮ/`.
+4. Додайте цю адресу в Supabase → Authentication → URL Configuration → Redirect URLs: `https://ВАШ-ЛОГІН.github.io/НАЗВА-РЕПОЗИТОРІЮ/**`.
+
+Важливо: GitHub Pages не вміє виконувати сирий код React/TypeScript. Якщо Source стоїть на «Deploy from a branch», браузер покаже помилку `Expected a JavaScript-or-Wasm module script… MIME type "application/octet-stream"` — це означає, що опубліковано вихідний код замість зібраної версії.
+
+URL і публічний ключ Supabase для збірки записано у workflow (вони публічні й однаково потрапляють у зібраний сайт). Щоб змінити їх без редагування файлу, створіть змінні `VITE_SUPABASE_URL` і `VITE_SUPABASE_PUBLISHABLE_KEY` у Settings → Secrets and variables → Actions → **Variables**.
