@@ -18,6 +18,7 @@ export type ProviderId =
   | "wordwall"
   | "learningapps"
   | "phet"
+  | "lab"
   | "other";
 
 export interface ProviderInfo {
@@ -38,6 +39,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
   wordwall: { id: "wordwall", label: "Wordwall", suggestedType: "game" },
   learningapps: { id: "learningapps", label: "LearningApps", suggestedType: "game" },
   phet: { id: "phet", label: "PhET", suggestedType: "simulation" },
+  lab: { id: "lab", label: "Віртуальна лабораторія", suggestedType: "simulation" },
   other: { id: "other", label: "Інший сайт", suggestedType: "link" },
 };
 
@@ -62,9 +64,40 @@ function hostIs(host: string, domain: string) {
   return host === domain || host.endsWith(`.${domain}`);
 }
 
+/** Базова адреса застосунку, напр. https://логін.github.io/physics-teacher-hub/ */
+function appBase(): URL | null {
+  try {
+    return new URL("./", window.location.href);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Власна лабораторія: HTML-файл із папки public/labs/ цього ж сайту
+ * (після публікації — https://логін.github.io/physics-teacher-hub/labs/…).
+ */
+export function isOwnLab(u: URL): boolean {
+  const base = appBase();
+  if (!base || u.origin !== base.origin) return false;
+  return u.pathname.startsWith(`${base.pathname}labs/`) && !u.pathname.includes("..");
+}
+
+/** Повна адреса лабораторії за назвою її папки: labUrl("magnetic-field") → …/labs/magnetic-field/ */
+export function labUrl(folder: string): string {
+  const base = appBase();
+  const href = base ? new URL(`labs/${folder}/`, base).href : `labs/${folder}/`;
+  try {
+    return decodeURI(href); // для показу: кирилиця без %D0%…
+  } catch {
+    return href;
+  }
+}
+
 export function detectProvider(raw: string | null | undefined): ProviderId | null {
   const u = parseSafeUrl(raw);
   if (!u) return null;
+  if (isOwnLab(u)) return "lab";
   const h = u.hostname.toLowerCase();
   const p = u.pathname;
   if (hostIs(h, "youtube.com") || hostIs(h, "youtu.be") || hostIs(h, "youtube-nocookie.com")) return "youtube";
@@ -122,13 +155,14 @@ export function getThumbnail(raw: string | null | undefined): string | null {
 export interface EmbedInfo {
   src: string;
   /** Співвідношення сторін для контейнера. */
-  aspect: "video" | "slides" | "doc" | "app";
+  aspect: "video" | "slides" | "doc" | "app" | "lab";
   allow?: string;
   /** Пісочниця для iframe; undefined — без обмежень sandbox (лише для перевірених провайдерів). */
   sandbox?: string;
 }
 
 const SANDBOX_APP = "allow-scripts allow-same-origin allow-popups allow-forms allow-presentation";
+const SANDBOX_LAB = "allow-scripts allow-forms allow-popups allow-modals allow-pointer-lock allow-downloads allow-presentation";
 
 /**
  * Будує адресу вбудовування для провайдерів із задокументованими форматами.
@@ -137,8 +171,14 @@ const SANDBOX_APP = "allow-scripts allow-same-origin allow-popups allow-forms al
  */
 export function getEmbed(raw: string | null | undefined): EmbedInfo | null {
   const u = parseSafeUrl(raw);
-  if (!u || u.protocol !== "https:") return null;
+  if (!u) return null;
   const provider = detectProvider(raw);
+  if (provider === "lab") {
+    // Без allow-same-origin: код лабораторії працює в ізольованому середовищі
+    // і не має доступу до вашого входу в застосунок (токенів Supabase).
+    return { src: u.href, aspect: "lab", allow: "fullscreen; clipboard-write", sandbox: SANDBOX_LAB };
+  }
+  if (u.protocol !== "https:") return null;
   const p = u.pathname;
 
   switch (provider) {
@@ -232,6 +272,8 @@ export function getEmbed(raw: string | null | undefined): EmbedInfo | null {
 
 export function embedHint(provider: ProviderId | null): string | null {
   switch (provider) {
+    case "lab":
+      return "Лабораторія з папки labs/ цього сайту — відкривається прямо в уроці та в режимі презентації.";
     case "kahoot":
       return "Kahoot не дозволяє вбудовування — гра відкриється в новій вкладці.";
     case "quizizz":
