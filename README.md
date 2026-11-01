@@ -53,6 +53,21 @@ npm run dev
 
 ---
 
+## Віртуальні лабораторії (власні HTML-файли)
+
+Власні інтерактивні сторінки (лабораторії, симуляції) кладіть у папку **`public/labs/`**, кожну у свою підпапку:
+
+```
+public/labs/electromagnet/index.html      → https://ЛОГІН.github.io/physics-teacher-hub/labs/electromagnet/
+public/labs/electromagnet/img/coil.png    ← додаткові файли лабораторії (якщо є) — поруч
+```
+
+Після публікації додайте в потрібній темі матеріал типу **«Симуляція»** з цією адресою. Застосунок розпізнає власну лабораторію й показує її прямо в уроці та в режимі презентації (а також кнопку «Відкрити в новій вкладці»).
+
+- Назви папок і файлів — латиницею, без пробілів.
+- Лабораторія працює в ізольованому вікні (`sandbox` без `allow-same-origin`): її код не має доступу до вашого входу в застосунок. Через це всередині уроку їй недоступні `localStorage`/cookies; у новій вкладці — доступні.
+- Додавання файлів на GitHub не змінює дані в Supabase: теми, матеріали й нотатки зберігаються в базі, а не в репозиторії.
+
 ## Технології
 
 React 18 · TypeScript · Vite 6 · Tailwind CSS 4 · компоненти у стилі shadcn/ui (Radix UI) · Lucide · React Router (HashRouter) · Motion · TanStack Query · React Hook Form + Zod · Sonner · dnd-kit · KaTeX · TipTap + DOMPurify · Supabase (PostgreSQL, Auth, RLS).
