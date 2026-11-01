@@ -83,10 +83,10 @@ export function isOwnLab(u: URL): boolean {
   return u.pathname.startsWith(`${base.pathname}labs/`) && !u.pathname.includes("..");
 }
 
-/** Повна адреса лабораторії за назвою її папки: labUrl("magnetic-field") → …/labs/magnetic-field/ */
-export function labUrl(folder: string): string {
+/** Повна адреса файлу лабораторії: labUrl("resonance/resonance-lab.html") → …/labs/resonance/resonance-lab.html */
+export function labUrl(path: string): string {
   const base = appBase();
-  const href = base ? new URL(`labs/${folder}/`, base).href : `labs/${folder}/`;
+  const href = base ? new URL(`labs/${path}`, base).href : `labs/${path}`;
   try {
     return decodeURI(href); // для показу: кирилиця без %D0%…
   } catch {
