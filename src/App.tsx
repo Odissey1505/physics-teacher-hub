@@ -35,6 +35,7 @@ const QuizEditorPage = lazy(() => import("@/pages/QuizEditorPage"));
 const QuizPlayPage = lazy(() => import("@/pages/QuizPlayPage"));
 const PresentationPage = lazy(() => import("@/pages/PresentationPage"));
 const WheelPage = lazy(() => import("@/pages/WheelPage"));
+const NoteFilePage = lazy(() => import("@/pages/NoteFilePage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -100,6 +101,16 @@ const router = createHashRouter([
           <RequireAuth>
             <Lazy>
               <PresentationPage />
+            </Lazy>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "/topics/:topicId/files/:fileId",
+        element: (
+          <RequireAuth>
+            <Lazy>
+              <NoteFilePage />
             </Lazy>
           </RequireAuth>
         ),

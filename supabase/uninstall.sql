@@ -9,7 +9,17 @@
 -- інших застосунків цього проєкту НЕ зачіпаються.
 -- =====================================================================
 
+-- Файли уроку: спершу правила сховища та таблиця.
+drop policy if exists pth_note_files_storage_select on storage.objects;
+drop policy if exists pth_note_files_storage_insert on storage.objects;
+drop policy if exists pth_note_files_storage_update on storage.objects;
+drop policy if exists pth_note_files_storage_delete on storage.objects;
+-- Самі файли й кошик pth-note-files видаліть вручну: Supabase → Storage →
+-- pth-note-files → виділити все → Delete, потім ⋯ → Delete bucket
+-- (Supabase не дозволяє видаляти файли сховища SQL-запитом).
+
 drop table if exists
+  public.pth_note_files,
   public.pth_wheel_groups,
   public.pth_quiz_answer_keys,
   public.pth_quiz_questions,

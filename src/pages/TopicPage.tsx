@@ -51,6 +51,7 @@ import { MaterialCard } from "@/components/materials/MaterialCard";
 import { FormulaCard } from "@/components/formulas/FormulaCard";
 import { InternalQuizList } from "@/components/quizzes/InternalQuizList";
 import { DeleteContainerDialog } from "@/components/topics/DeleteContainerDialog";
+import { NoteFilesSection } from "@/components/notes/NoteFiles";
 import { useDuplicateTopic } from "@/components/topics/TopicCard";
 import { NotFoundPage } from "./NotFoundPage";
 import { usePageMeta } from "@/context/page-meta";
@@ -470,6 +471,10 @@ function NotesTab({ topicId }: { topicId: string }) {
           <Plus /> Нова нотатка
         </Button>
       </div>
+      <NoteFilesSection topicId={topicId} />
+      <h2 className="flex items-center gap-2 pt-2 font-semibold">
+        <NotebookPen className="size-4 text-primary" /> Нотатки
+      </h2>
       {notes.isLoading ? (
         <Skeleton className="h-40" />
       ) : notes.isError ? (

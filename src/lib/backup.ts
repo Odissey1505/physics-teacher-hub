@@ -8,7 +8,10 @@ export const BACKUP_VERSION = 1;
 export const MAX_BACKUP_BYTES = 20 * 1024 * 1024; // 20 МБ
 const MAX_RECORDS = 50_000;
 
-const TABLE_ORDER: TableName[] = [
+/** Файли уроку лежать у сховищі Supabase і до JSON-копії не входять (їх можна завантажити окремо). */
+type BackupTable = Exclude<TableName, "note_files">;
+
+const TABLE_ORDER: BackupTable[] = [
   "classes",
   "sections",
   "topics",
@@ -34,13 +37,14 @@ export const TABLE_LABELS: Record<TableName, string> = {
   quiz_questions: "Питання квізів",
   quiz_answer_keys: "Ключі відповідей",
   wheel_groups: "Класи колеса опитування",
+  note_files: "Файли уроку",
 };
 
 export interface BackupFile {
   app: typeof BACKUP_APP;
   version: typeof BACKUP_VERSION;
   exported_at: string;
-  data: Record<TableName, Record<string, unknown>[]>;
+  data: Record<BackupTable, Record<string, unknown>[]>;
 }
 
 /** Експорт усіх даних поточного користувача (RLS гарантує, що лише власних). */

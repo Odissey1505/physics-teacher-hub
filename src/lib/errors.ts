@@ -55,6 +55,12 @@ export function humanizeError(err: unknown): string {
   if (e.code === "42P01" || /relation .* does not exist|Could not find the table/i.test(msg)) {
     return "У базі даних немає таблиць Physics Teacher Hub. Виконайте файл supabase/physics-teacher-hub-SQL.sql у Supabase → SQL Editor.";
   }
+  if (/Bucket not found/i.test(msg)) {
+    return "Сховище файлів ще не підключено. Виконайте в Supabase файл supabase/migrations/20261122000004_note_files.sql.";
+  }
+  if (/maximum allowed size|Payload too large|entity too large/i.test(msg) || e.status === 413) {
+    return "Файл завеликий для сховища Supabase (максимум 50 МБ).";
+  }
   if (/Invalid login credentials/i.test(msg)) return "Невірний email або пароль.";
   if (/Email not confirmed/i.test(msg)) return "Email ще не підтверджено. Перевірте пошту (і папку «Спам»).";
   if (/User already registered/i.test(msg)) return "Користувач із таким email уже зареєстрований.";

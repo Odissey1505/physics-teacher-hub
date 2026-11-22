@@ -6,7 +6,8 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogTi
 import { Button } from "@/components/ui/button";
 import { deleteContainer } from "@/lib/api";
 import { humanizeError } from "@/lib/errors";
-import { qk, useCourse, useFormulas, useInvalidate, useMaterials, useNotes, useQuizzes } from "@/lib/queries";
+import { qk, useCourse, useFormulas, useInvalidate, useMaterials, useNoteFiles, useNotes, useQuizzes } from "@/lib/queries";
+import { removeNoteFileObjects } from "@/lib/api";
 import { cn, countLabel } from "@/lib/utils";
 
 export type ContainerKind = "topic" | "section" | "class";
@@ -39,6 +40,7 @@ export function DeleteContainerDialog({
   const formulas = useFormulas();
   const quizzes = useQuizzes();
   const notes = useNotes();
+  const noteFiles = useNoteFiles();
   const invalidate = useInvalidate();
   const [mode, setMode] = useState<"inbox" | "all">("inbox");
 
@@ -60,15 +62,24 @@ export function DeleteContainerDialog({
       formulas: (formulas.data ?? []).filter((f) => f.topic_id && set.has(f.topic_id)).length,
       quizzes: (quizzes.data ?? []).filter((q) => q.topic_id && set.has(q.topic_id)).length,
       notes: (notes.data ?? []).filter((n) => set.has(n.topic_id)).length,
+      files: (noteFiles.data ?? []).filter((f) => set.has(f.topic_id)),
     };
-  }, [kind, id, course, materials.data, formulas.data, quizzes.data, notes.data]);
+  }, [kind, id, course, materials.data, formulas.data, quizzes.data, notes.data, noteFiles.data]);
 
   const hasContent = affected.materials + affected.formulas + affected.quizzes > 0;
 
   const mutation = useMutation({
-    mutationFn: () => deleteContainer(kind, id, hasContent ? mode : "inbox"),
+    mutationFn: async () => {
+      // Спершу прибираємо файли уроку зі сховища (описи видалить сама база разом із темами).
+      try {
+        await removeNoteFileObjects(affected.files.map((f) => f.storage_path));
+      } catch {
+        /* не заважає видаленню теми; залишки можна прибрати в Supabase → Storage */
+      }
+      return deleteContainer(kind, id, hasContent ? mode : "inbox");
+    },
     onSuccess: async () => {
-      await invalidate(qk.classes, qk.sections, qk.topics, qk.materials, qk.formulas, qk.quizzes, qk.notes);
+      await invalidate(qk.classes, qk.sections, qk.topics, qk.materials, qk.formulas, qk.quizzes, qk.notes, qk.noteFiles);
       toast.success(`${KIND_LABEL[kind].nom} «${title}» видалено`);
       onClose();
       onDeleted?.();
@@ -93,6 +104,7 @@ export function DeleteContainerDialog({
                 {kind !== "topic" && <li>{countLabel(affected.topics, ["тема", "теми", "тем"])}</li>}
                 <li>теорія та огляд {kind === "topic" ? "теми" : "тем"}</li>
                 {affected.notes > 0 && <li>{countLabel(affected.notes, ["нотатка вчителя", "нотатки вчителя", "нотаток вчителя"])}</li>}
+                {affected.files.length > 0 && <li>{countLabel(affected.files.length, ["файл уроку", "файли уроку", "файлів уроку"])}</li>}
               </ul>
             </div>
           </div>

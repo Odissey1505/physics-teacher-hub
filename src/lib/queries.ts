@@ -12,6 +12,7 @@ export const qk = {
   notes: ["notes"] as const,
   quizzes: ["quizzes"] as const,
   wheel: ["wheel_groups"] as const,
+  noteFiles: ["note_files"] as const,
   profile: ["profile"] as const,
   topicContent: (id: string) => ["topic_content", id] as const,
   questions: (quizId: string) => ["quiz_questions", quizId] as const,
@@ -25,6 +26,12 @@ export const useMaterials = () => useQuery({ queryKey: qk.materials, queryFn: ap
 export const useFormulas = () => useQuery({ queryKey: qk.formulas, queryFn: api.fetchFormulas });
 export const useNotes = () => useQuery({ queryKey: qk.notes, queryFn: api.fetchNotes });
 export const useQuizzes = () => useQuery({ queryKey: qk.quizzes, queryFn: api.fetchQuizzes });
+export const useNoteFiles = () =>
+  useQuery({
+    queryKey: qk.noteFiles,
+    queryFn: api.fetchNoteFiles,
+    retry: (count, err) => (err as Error)?.message !== "NOTE_FILES_NOT_INSTALLED" && count < 2,
+  });
 export const useWheelGroups = () =>
   useQuery({
     queryKey: qk.wheel,

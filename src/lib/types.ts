@@ -157,6 +157,20 @@ export interface WheelGroup {
   updated_at: string;
 }
 
+/** Файл уроку в «Нотатках вчителя» (вміст — у приватному сховищі Supabase). */
+export interface NoteFile {
+  id: string;
+  owner_id: string;
+  topic_id: string;
+  title: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_path: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GradeResult {
   correct: boolean;
   correct_answer: string | null;

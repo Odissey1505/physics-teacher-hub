@@ -14,6 +14,7 @@ import type {
   Topic,
   TopicContent,
   WheelGroup,
+  NoteFile,
 } from "./types";
 
 export type TableName =
@@ -27,7 +28,8 @@ export type TableName =
   | "quizzes"
   | "quiz_questions"
   | "quiz_answer_keys"
-  | "wheel_groups";
+  | "wheel_groups"
+  | "note_files";
 
 const PAGE = 1000;
 
@@ -171,6 +173,97 @@ export async function fetchWheelGroups(): Promise<WheelGroup[]> {
 export function isMissingTable(e: unknown) {
   const err = e as { code?: string; message?: string } | null;
   return err?.code === "42P01" || err?.code === "PGRST205" || /Could not find the table|does not exist/i.test(err?.message ?? "");
+}
+
+/* ---------------- Файли уроку (приватне сховище) ---------------- */
+
+export const NOTE_FILES_BUCKET = "pth-note-files";
+export const MAX_NOTE_FILE_BYTES = 50 * 1024 * 1024;
+
+export async function fetchNoteFiles(): Promise<NoteFile[]> {
+  try {
+    return await fetchAll<NoteFile>("note_files", [{ column: "created_at", ascending: false }]);
+  } catch (e) {
+    if (isMissingTable(e)) throw new Error("NOTE_FILES_NOT_INSTALLED");
+    throw e;
+  }
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  html: "text/html",
+  htm: "text/html",
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  svg: "image/svg+xml",
+  mp3: "audio/mpeg",
+  mp4: "video/mp4",
+  txt: "text/plain",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+export function fileExt(name: string) {
+  const m = name.toLowerCase().match(/\.([a-z0-9]{1,5})$/);
+  return m ? m[1] : "";
+}
+
+export function guessMime(file: { name: string; type?: string }) {
+  return MIME_BY_EXT[fileExt(file.name)] ?? (file.type || "application/octet-stream");
+}
+
+/** Безпечна назва для шляху в сховищі (оригінальна назва зберігається окремо). */
+function storageSafeName(name: string) {
+  const ext = fileExt(name);
+  const base = name.replace(/\.[^.]+$/, "").replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60);
+  return `${base || "file"}${ext ? `.${ext}` : ""}`;
+}
+
+export async function uploadNoteFile(topicId: string, file: File, title: string): Promise<NoteFile> {
+  if (file.size > MAX_NOTE_FILE_BYTES) throw new Error("Файл завеликий: максимум 50 МБ.");
+  const { data: u } = await db().auth.getUser();
+  if (!u.user) throw new Error("Потрібна авторизація");
+  const id = crypto.randomUUID();
+  const path = `${u.user.id}/${id}/${storageSafeName(file.name)}`;
+  const mime = guessMime(file);
+  const { error } = await db().storage.from(NOTE_FILES_BUCKET).upload(path, await file.arrayBuffer(), { contentType: mime, upsert: false });
+  if (error) throw error;
+  try {
+    return await insertRow<NoteFile>("note_files", {
+      id,
+      topic_id: topicId,
+      title: title.trim().slice(0, 200),
+      file_name: file.name.slice(0, 255),
+      mime_type: mime,
+      size_bytes: file.size,
+      storage_path: path,
+    });
+  } catch (e) {
+    await db().storage.from(NOTE_FILES_BUCKET).remove([path]);
+    throw e;
+  }
+}
+
+export async function downloadNoteFile(f: Pick<NoteFile, "storage_path">): Promise<Blob> {
+  const { data, error } = await db().storage.from(NOTE_FILES_BUCKET).download(f.storage_path);
+  if (error) throw error;
+  return data;
+}
+
+/** Видаляє файли зі сховища (помилки «не знайдено» ігноруються). */
+export async function removeNoteFileObjects(paths: string[]) {
+  if (paths.length === 0) return;
+  const { error } = await db().storage.from(NOTE_FILES_BUCKET).remove(paths);
+  if (error && !/not.?found/i.test(error.message)) throw error;
+}
+
+export async function deleteNoteFile(f: NoteFile) {
+  await removeNoteFileObjects([f.storage_path]);
+  await deleteRow("note_files", f.id);
 }
 
 export async function deleteRow(table: TableName, id: string) {

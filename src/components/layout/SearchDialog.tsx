@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Search, BookOpenText, Sigma, NotebookPen, ListChecks, CornerDownLeft } from "lucide-react";
+import { Search, BookOpenText, Sigma, NotebookPen, ListChecks, CornerDownLeft, Paperclip } from "lucide-react";
 import { MATERIAL_TYPE_MAP } from "@/lib/constants";
-import { useCourse, useFormulas, useMaterials, useNotes, useQuizzes } from "@/lib/queries";
+import { useCourse, useFormulas, useMaterials, useNoteFiles, useNotes, useQuizzes } from "@/lib/queries";
 import { matchesQuery, normalizeSearch, stripHtml, cn } from "@/lib/utils";
 import { providerLabel } from "@/lib/providers";
 
@@ -28,6 +28,7 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const materials = useMaterials();
   const formulas = useFormulas();
   const notes = useNotes();
+  const noteFiles = useNoteFiles();
   const quizzes = useQuizzes();
 
   useEffect(() => {
@@ -105,8 +106,20 @@ export function SearchDialog({ open, onOpenChange }: { open: boolean; onOpenChan
           icon: NotebookPen,
         })),
     );
+    push(
+      (noteFiles.data ?? [])
+        .filter((f) => matchesQuery(`${f.title} ${f.file_name}`, q))
+        .map((f) => ({
+          id: f.id,
+          group: "Файли уроку",
+          title: f.title,
+          subtitle: course.topicLabel(f.topic_id),
+          to: `/topics/${f.topic_id}/files/${f.id}`,
+          icon: Paperclip,
+        })),
+    );
     return out;
-  }, [query, course, materials.data, formulas.data, notes.data, quizzes.data]);
+  }, [query, course, materials.data, formulas.data, notes.data, quizzes.data, noteFiles.data]);
 
   useEffect(() => setActive(0), [query]);
 
