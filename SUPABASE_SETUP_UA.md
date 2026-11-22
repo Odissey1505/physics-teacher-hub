@@ -39,7 +39,7 @@ Supabase — це хмарна база даних (PostgreSQL) зі вбудо�
 2. Відкрийте на комп'ютері файл `supabase/physics-teacher-hub-SQL.sql` (Блокнотом або VS Code), виділіть усе (**Ctrl + A**), скопіюйте й вставте в редактор Supabase.
 3. Натисніть **Run** (або **Ctrl + Enter**). Має з'явитися `Success. No rows returned`. Якщо Supabase попросить підтвердити запуск — підтвердьте.
 
-Перевірка: у **Table Editor** з'являться таблиці `pth_profiles`, `pth_classes`, `pth_sections`, `pth_topics`, `pth_topic_content`, `pth_materials`, `pth_formulas`, `pth_notes`, `pth_quizzes`, `pth_quiz_questions`, `pth_quiz_answer_keys`, `pth_allowed_emails` — усі з увімкненим RLS.
+Перевірка: у **Table Editor** з'являться таблиці `pth_profiles`, `pth_classes`, `pth_sections`, `pth_topics`, `pth_topic_content`, `pth_materials`, `pth_formulas`, `pth_notes`, `pth_quizzes`, `pth_quiz_questions`, `pth_quiz_answer_keys`, `pth_allowed_emails`, `pth_wheel_groups` — усі з увімкненим RLS.
 
 > Повторний запуск видасть помилку «already exists» — це означає, що все вже встановлено. Помилка зупиняє весь запуск, тож нічого не дублюється й не ламається.
 >
@@ -52,6 +52,10 @@ Supabase — це хмарна база даних (PostgreSQL) зі вбудо�
 - функції (усі з префіксом `pth_`): ідемпотентне початкове наповнення (9 клас, Розділ 1, 15 тем), сортування, безпечне видалення, дублювання теми та квізу, перевірка відповідей квізу, атомарне збереження питання, атомарний імпорт резервної копії, перевірка доступу.
 
 Початкові 15 тем **не записані у фронтенді** — їх створює SQL-функція `pth_initialize_workspace()` під час першого входу кожного акаунта рівно один раз.
+
+### Оновлення: колесо опитування (листопад 2026)
+
+Якщо платформу вже встановлено раніше, виконайте **лише** файл `supabase/migrations/20261122000003_wheel.sql` (SQL Editor → New query → вставте весь текст → Run). Він додає таблицю `pth_wheel_groups` для списків учнів і нічого з наявного не змінює. Повний файл `physics-teacher-hub-SQL.sql` уже містить цю частину — для нових встановлень.
 
 ### Спільний проєкт: обмежте доступ лише собою (рекомендовано)
 
