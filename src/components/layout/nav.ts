@@ -11,6 +11,7 @@ import {
   Star,
   Inbox,
   Settings,
+  Disc3,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,5 +34,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/tests", label: "Тести та контрольні", icon: ClipboardCheck },
   { to: "/favorites", label: "Обране", icon: Star },
   { to: "/inbox", label: "Скарбничка матеріалів", icon: Inbox },
+  { to: "/wheel", label: "Колесо опитування", icon: Disc3 },
   { to: "/settings", label: "Налаштування", icon: Settings },
 ];

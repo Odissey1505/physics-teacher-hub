@@ -13,7 +13,7 @@ import { RichTextEditor } from "@/components/common/RichTextEditor";
 import { Field, Input, NativeSelect, Switch, Textarea, Label } from "@/components/ui/form-controls";
 import { Badge } from "@/components/ui/misc";
 import { MATERIAL_TYPES, MATERIAL_TYPE_MAP, VISIBILITY_LABELS } from "@/lib/constants";
-import { PROVIDERS, detectProvider, embedHint, getEmbed, getThumbnail, isSafeUrl } from "@/lib/providers";
+import { PROVIDERS, detectProvider, embedHint, getEmbed, getThumbnail, isSafeUrl, labUrl } from "@/lib/providers";
 import { insertRow, updateVersioned, fetchUpdatedAt } from "@/lib/api";
 import { ConflictError, humanizeError } from "@/lib/errors";
 import { qk, useInvalidate, useMaterials } from "@/lib/queries";
@@ -172,7 +172,15 @@ export function MaterialDialog({
           htmlFor="m-url"
           required={typeInfo.requiresUrl}
           error={formState.errors.url?.message}
-          hint={typeInfo.requiresUrl ? undefined : "Необов'язково для письмових матеріалів"}
+          hint={
+            type === "simulation" || type === "experiment" ? (
+              <>
+                Власна лабораторія <code>public/labs/папка/файл.html</code> має адресу <code className="break-all">{labUrl("папка/файл.html")}</code>
+              </>
+            ) : typeInfo.requiresUrl ? undefined : (
+              "Необов'язково для письмових матеріалів"
+            )
+          }
         >
           <Input
             id="m-url"

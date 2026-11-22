@@ -152,6 +152,12 @@
     radial-gradient(ellipse at 80% 50%, transparent 52%, var(--field-line) 53%, transparent 54%);
 }
 
+/* Колесо опитування: пульсація вказівника */
+@keyframes wheel-pointer {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.05); }
+}
+
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
 
 @media (prefers-reduced-motion: reduce) {

@@ -13,6 +13,7 @@ import type {
   Section,
   Topic,
   TopicContent,
+  WheelGroup,
 } from "./types";
 
 export type TableName =
@@ -25,7 +26,8 @@ export type TableName =
   | "notes"
   | "quizzes"
   | "quiz_questions"
-  | "quiz_answer_keys";
+  | "quiz_answer_keys"
+  | "wheel_groups";
 
 const PAGE = 1000;
 
@@ -154,6 +156,21 @@ export async function patchMany(table: TableName, ids: string[], patch: Record<s
   if (ids.length === 0) return;
   const { error } = await tbl(table).update(patch).in("id", ids);
   if (error) throw error;
+}
+
+/** Класи колеса опитування. Якщо міграцію 3 ще не виконано — помилка з кодом WHEEL_NOT_INSTALLED. */
+export async function fetchWheelGroups(): Promise<WheelGroup[]> {
+  try {
+    return await fetchAll<WheelGroup>("wheel_groups", [{ column: "sort_order" }, { column: "created_at" }]);
+  } catch (e) {
+    if (isMissingTable(e)) throw new Error("WHEEL_NOT_INSTALLED");
+    throw e;
+  }
+}
+
+export function isMissingTable(e: unknown) {
+  const err = e as { code?: string; message?: string } | null;
+  return err?.code === "42P01" || err?.code === "PGRST205" || /Could not find the table|does not exist/i.test(err?.message ?? "");
 }
 
 export async function deleteRow(table: TableName, id: string) {

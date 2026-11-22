@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { fetchAll, type TableName } from "./api";
+import { fetchAll, isMissingTable, type TableName } from "./api";
 import type { Formula, Material, Quiz, Topic } from "./types";
 import { normalizeSearch } from "./utils";
 
@@ -19,6 +19,7 @@ const TABLE_ORDER: TableName[] = [
   "quizzes",
   "quiz_questions",
   "quiz_answer_keys",
+  "wheel_groups",
 ];
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -32,6 +33,7 @@ export const TABLE_LABELS: Record<TableName, string> = {
   quizzes: "Вбудовані квізи",
   quiz_questions: "Питання квізів",
   quiz_answer_keys: "Ключі відповідей",
+  wheel_groups: "Класи колеса опитування",
 };
 
 export interface BackupFile {
@@ -47,7 +49,14 @@ export async function exportWorkspace(): Promise<BackupFile> {
   for (const t of TABLE_ORDER) {
     const order =
       t === "topic_content" || t === "quiz_answer_keys" ? [{ column: "created_at" }] : [{ column: "created_at" }];
-    const rows = await fetchAll<Record<string, unknown>>(t, order);
+    let rows: Record<string, unknown>[];
+    try {
+      rows = await fetchAll<Record<string, unknown>>(t, order);
+    } catch (e) {
+      // Колесо опитування з'явилося пізніше: якщо його міграцію ще не виконано — просто пропускаємо.
+      if (t === "wheel_groups" && isMissingTable(e)) rows = [];
+      else throw e;
+    }
     // owner_id у файл не пишемо: при імпорті власником завжди стає поточний акаунт.
     data[t] = rows.map(({ owner_id: _o, ...rest }) => rest);
   }
@@ -70,6 +79,14 @@ const backupSchema = z.object({
     quizzes: z.array(idRow.extend({ title: z.string() })).default([]),
     quiz_questions: z.array(idRow.extend({ quiz_id: z.string(), qtype: z.string(), prompt: z.string() })).default([]),
     quiz_answer_keys: z.array(z.object({ question_id: z.string() }).passthrough()).default([]),
+    wheel_groups: z
+      .array(
+        idRow.extend({
+          title: z.string(),
+          students: z.array(z.object({ name: z.string(), selected: z.boolean() })).max(300),
+        }),
+      )
+      .default([]),
   }),
 });
 

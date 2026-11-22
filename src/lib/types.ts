@@ -141,6 +141,22 @@ export interface QuizAnswerKey {
   updated_at: string;
 }
 
+export interface WheelStudent {
+  name: string;
+  selected: boolean;
+}
+
+/** Клас (група) для «Колеса опитування». Списки учнів зберігаються лише в базі. */
+export interface WheelGroup {
+  id: string;
+  owner_id: string;
+  title: string;
+  students: WheelStudent[];
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface GradeResult {
   correct: boolean;
   correct_answer: string | null;

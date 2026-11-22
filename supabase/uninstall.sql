@@ -10,6 +10,7 @@
 -- =====================================================================
 
 drop table if exists
+  public.pth_wheel_groups,
   public.pth_quiz_answer_keys,
   public.pth_quiz_questions,
   public.pth_quizzes,
@@ -37,3 +38,4 @@ drop function if exists public.pth_reorder_items(text, uuid[]);
 drop function if exists public.pth_initialize_workspace();
 drop function if exists public.pth_has_access();
 drop function if exists public.pth_set_updated_at();
+drop function if exists public.pth_valid_students(jsonb);

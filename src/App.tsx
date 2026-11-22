@@ -34,6 +34,7 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 const QuizEditorPage = lazy(() => import("@/pages/QuizEditorPage"));
 const QuizPlayPage = lazy(() => import("@/pages/QuizPlayPage"));
 const PresentationPage = lazy(() => import("@/pages/PresentationPage"));
+const WheelPage = lazy(() => import("@/pages/WheelPage"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -99,6 +100,16 @@ const router = createHashRouter([
           <RequireAuth>
             <Lazy>
               <PresentationPage />
+            </Lazy>
+          </RequireAuth>
+        ),
+      },
+      {
+        path: "/wheel",
+        element: (
+          <RequireAuth>
+            <Lazy>
+              <WheelPage />
             </Lazy>
           </RequireAuth>
         ),

@@ -17,6 +17,7 @@ import {
   Library,
   Link2,
   Play,
+  Disc3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from "@/components/ui/misc";
@@ -226,6 +227,12 @@ export function DashboardPage() {
               className="flex flex-col items-start gap-2 rounded-xl border border-border p-3 text-sm font-medium transition hover:border-primary/60 hover:bg-primary/5"
             >
               <Library className="size-5 text-primary" aria-hidden /> Бібліотека
+            </Link>
+            <Link
+              to="/wheel"
+              className="col-span-2 flex items-center gap-3 rounded-xl bg-gradient-to-r from-sky-500 via-indigo-600 to-purple-600 p-3 text-sm font-bold text-white shadow-md shadow-indigo-500/20 transition hover:brightness-110"
+            >
+              <Disc3 className="size-5" aria-hidden /> Колесо опитування — хто відповідає?
             </Link>
           </CardContent>
         </Card>
