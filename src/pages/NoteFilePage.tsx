@@ -8,12 +8,13 @@ import { ErrorState } from "@/components/common/States";
 import { fileKind, formatSize, saveBlob } from "@/components/notes/NoteFiles";
 import { downloadNoteFile } from "@/lib/api";
 import { humanizeError } from "@/lib/errors";
+import { prepareLessonSrcdoc } from "@/lib/lesson-html";
 import { useCourse, useNoteFiles } from "@/lib/queries";
 
 /**
  * Повноекранний перегляд файлу уроку з приватного сховища.
- * HTML відкривається як повноцінна сторінка (iframe з blob-адресою того ж сайту),
- * тож працюють його скрипти, збереження правок (localStorage / IndexedDB), PDF і вкладення.
+ * HTML відкривається як повноцінна сторінка (iframe srcdoc того ж сайту),
+ * тож працюють його скрипти, збереження правок (localStorage / IndexedDB), PDF, вкладення та YouTube.
  */
 export default function NoteFilePage() {
   const { topicId = "", fileId = "" } = useParams();
@@ -41,6 +42,19 @@ export default function NoteFilePage() {
   useEffect(() => () => {
     if (url) URL.revokeObjectURL(url);
   }, [url]);
+
+  // HTML показуємо через srcdoc (див. lesson-html.ts), blob-адреса лишається для «Нової вкладки».
+  const [html, setHtml] = useState<{ id: string; doc: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (kind === "html" && blob.data) {
+      void blob.data.text().then((t) => alive && setHtml({ id: fileId, doc: prepareLessonSrcdoc(t) }));
+    }
+    return () => {
+      alive = false;
+    };
+  }, [blob.data, kind, fileId]);
+  const htmlDoc = html?.id === fileId ? html.doc : null;
 
   useEffect(() => {
     document.title = f ? `${f.title} · Physics Teacher Hub` : "Файл уроку";
@@ -122,7 +136,7 @@ export default function NoteFilePage() {
       </header>
 
       <main className="relative min-h-0 flex-1">
-        {blob.isLoading || (!url && !blob.isError) ? (
+        {blob.isLoading || ((!url || (kind === "html" && htmlDoc === null)) && !blob.isError) ? (
           <div className="grid h-full place-items-center text-muted-foreground">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="size-7 animate-spin text-primary" />
@@ -135,7 +149,8 @@ export default function NoteFilePage() {
           </div>
         ) : kind === "html" ? (
           <iframe
-            src={url!}
+            key={f.id}
+            srcDoc={htmlDoc!}
             title={f.title}
             className="size-full border-0 bg-white"
             allow="fullscreen; clipboard-write; autoplay"
